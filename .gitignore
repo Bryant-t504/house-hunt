@@ -1,0 +1,28 @@
+# ========================
+# Python / Django
+# ========================
+__pycache__/           # Compiled Python bytecode (auto-generated, never commit)
+*.py[cod]              # .pyc, .pyo, .pyd files
+*.so                   # Compiled C extensions
+db.sqlite3             # Default Django dev database
+*.log                  # Log files
+.env                   # Environment variables (SECRET KEYS, DB passwords)
+venv/                  # Python virtual environment folder
+env/                   # Alternative venv folder name
+migrations/            # We'll track these later, ignore for now
+
+# ========================
+# Node / React
+# ========================
+node_modules/          # Installed npm packages (HUGE, never commit)
+dist/                  # Production build output
+.vite/                 # Vite cache
+
+# ========================
+# IDE / OS files
+# ========================
+.vscode/               # VS Code settings
+.idea/                 # PyCharm / IntelliJ settings
+*.swp                  # Vim swap files
+.DS_Store              # macOS folder metadata
+Thumbs.db              # Windows thumbnail cache
