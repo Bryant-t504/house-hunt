@@ -1,9 +1,26 @@
-from rest_framework import generics, permissions
+from rest_framework import generics, permissions, status
 from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework_simplejwt.tokens import RefreshToken
 from django.contrib.auth import get_user_model
 from .serializers import UserSerializer, RegisterSerializer
 
 User = get_user_model()
+
+class LogoutView(APIView):
+    """
+    API endpoint that allows users to log out by blacklisting their refresh token.
+    """
+    permission_classes = (permissions.IsAuthenticated,)
+
+    def post(self, request):
+        try:
+            refresh_token = request.data["refresh"]
+            token = RefreshToken(refresh_token)
+            token.blacklist()
+            return Response(status=status.HTTP_205_RESET_CONTENT)
+        except Exception as e:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
 
 class RegisterView(generics.CreateAPIView):
     """
@@ -42,9 +59,12 @@ class VerifyLandlordView(generics.UpdateAPIView):
     """
     queryset = User.objects.filter(role='LANDLORD')
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAdminUser]
+    permission_classes = [permissions.IsAuthenticated]
 
     def patch(self, request, *args, **kwargs):
+        if not request.user.is_staff:
+            return Response({"detail": "Admin access required."}, status=status.HTTP_403_FORBIDDEN)
+            
         user = self.get_object()
         user.is_verified = not user.is_verified # Toggle verification
         user.save()

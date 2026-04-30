@@ -1,7 +1,7 @@
 from rest_framework import generics, permissions, status
 from rest_framework.response import Response
 from .models import Booking
-from .serializers import BookingSerializer
+from .serializers import BookingSerializer, BookingUpdateSerializer
 
 class BookingListCreateView(generics.ListCreateAPIView):
     """
@@ -12,6 +12,8 @@ class BookingListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        if user.is_staff:
+            return Booking.objects.all()
         # Logic: If you are a tenant, see what you booked.
         # If you are a landlord, see who booked your properties.
         if user.role == 'LANDLORD':
@@ -24,20 +26,50 @@ class BookingListCreateView(generics.ListCreateAPIView):
 
 class BookingUpdateView(generics.UpdateAPIView):
     """
-    View for Landlords to Approve/Reject a booking.
+    View for Landlords (or Staff) to Approve/Reject a booking.
     """
-    serializer_class = BookingSerializer
+    serializer_class = BookingUpdateSerializer
     permission_classes = [permissions.IsAuthenticated]
 
     def get_queryset(self):
-        # Landlords can only update bookings for their own properties
-        return Booking.objects.filter(property__landlord=self.request.user)
+        user = self.request.user
+        if user.is_staff:
+            return Booking.objects.all()
+        # Landlords can update bookings for their properties
+        # Tenants can update (cancel) their own bookings
+        from django.db.models import Q
+        return Booking.objects.filter(Q(property__landlord=user) | Q(tenant=user))
 
     def patch(self, request, *args, **kwargs):
-        # Custom logic: Only landlords can change the status
-        if request.user.role != 'LANDLORD':
-            return Response(
-                {"detail": "Only landlords can update booking status."}, 
-                status=status.HTTP_403_FORBIDDEN
-            )
+        user = request.user
+        booking = self.get_object()
+        new_status = request.data.get('status')
+
+        # Security Logic:
+        # 1. Tenants can ONLY set status to CANCELLED
+        if user.role == 'TENANT' and not user.is_staff:
+            if new_status != 'CANCELLED':
+                return Response(
+                    {"detail": "Tenants can only cancel their bookings."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            if booking.tenant != user:
+                return Response(
+                    {"detail": "You can only cancel your own bookings."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+        # 2. Landlords can set status to APPROVED or REJECTED
+        if user.role == 'LANDLORD' and not user.is_staff:
+            if new_status not in ['APPROVED', 'REJECTED']:
+                return Response(
+                    {"detail": "Landlords can only approve or reject bookings."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+            if booking.property.landlord != user:
+                return Response(
+                    {"detail": "You can only manage bookings for your own properties."}, 
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
         return super().patch(request, *args, **kwargs)

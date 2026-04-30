@@ -14,7 +14,8 @@ class PropertySerializer(serializers.ModelSerializer):
         fields = (
             'id', 'landlord', 'landlord_username', 'title', 
             'description', 'address', 'city', 'price', 
+            'bedrooms', 'bathrooms', 'amenities',
             'property_type', 'image', 'is_available', 
-            'created_at', 'updated_at'
+            'verification_status', 'created_at', 'updated_at'
         )
-        read_only_fields = ('id', 'landlord', 'created_at', 'updated_at')
+        read_only_fields = ('id', 'landlord', 'verification_status', 'created_at', 'updated_at')

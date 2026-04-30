@@ -23,8 +23,7 @@ const PropertyCard = ({ property }) => {
                 </div>
                 <div className="absolute bottom-4 left-4">
                     <div className="bg-primary-600 px-4 py-2 rounded-xl text-white font-bold flex items-center gap-1 shadow-lg">
-                        <DollarSign className="w-4 h-4" />
-                        <span>{parseFloat(property.price).toLocaleString()}</span>
+                        <span className="text-xl font-bold text-white">KSh {parseFloat(property.price).toLocaleString()}</span>
                         <span className="text-xs font-normal opacity-80">/mo</span>
                     </div>
                 </div>

@@ -26,7 +26,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # ─────────────────────────────────────────────────────────────
 SECRET_KEY = config('SECRET_KEY')          # cryptographic key for sessions/tokens
 DEBUG = config('DEBUG', default=False, cast=bool)  # False in production!
-ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost').split(',')
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='localhost').split(',') + ['testserver']
 
 
 # ─────────────────────────────────────────────────────────────
@@ -49,6 +49,7 @@ INSTALLED_APPS = [
     # --- Third-party packages ---
     'rest_framework',                 # Django REST Framework (DRF) — builds our API
     'rest_framework_simplejwt',       # JWT authentication tokens
+    'rest_framework_simplejwt.token_blacklist', # For blacklisting tokens on logout
     'corsheaders',                    # Allows React frontend to call our API
 
     # --- GridNest feature apps (added as we build each phase) ---
@@ -109,11 +110,25 @@ WSGI_APPLICATION = 'gridnest.wsgi.application'
 ASGI_APPLICATION = 'gridnest.asgi.application'
 
 # Channel Layers (The 'Switchboard' for messages)
-CHANNEL_LAYERS = {
-    'default': {
-        'BACKEND': 'channels.layers.InMemoryChannelLayer',
-    },
-}
+# We use Redis in production for reliability and scalability.
+# Local development can fallback to InMemory if REDIS_URL is not provided.
+REDIS_URL = config('REDIS_URL', default='')
+
+if REDIS_URL:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels_redis.core.RedisChannelLayer',
+            'CONFIG': {
+                "hosts": [REDIS_URL],
+            },
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        'default': {
+            'BACKEND': 'channels.layers.InMemoryChannelLayer',
+        },
+    }
 
 
 # ─────────────────────────────────────────────────────────────
@@ -121,11 +136,14 @@ CHANNEL_LAYERS = {
 # PostgreSQL is our production database.
 # Credentials are loaded securely from the .env file.
 # ─────────────────────────────────────────────────────────────
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': config(
+        'DATABASE_URL',
+        default=f"sqlite:///{BASE_DIR / 'db.sqlite3'}",
+        cast=dj_database_url.parse
+    )
 }
 
 
@@ -195,6 +213,9 @@ REST_FRAMEWORK = {
         'rest_framework.filters.SearchFilter',
         'rest_framework.filters.OrderingFilter',
     ),
+    # Pagination to handle large datasets
+    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
+    'PAGE_SIZE': 12,
 }
 
 
@@ -214,11 +235,59 @@ SIMPLE_JWT = {
 # ─────────────────────────────────────────────────────────────
 # CORS (Cross-Origin Resource Sharing)
 # Tells Django to accept API requests from the React frontend.
-CORS_ALLOW_ALL_ORIGINS = True  # Temporary fix for local development
+CORS_ALLOW_ALL_ORIGINS = False  # Secure by default
 CORS_ALLOW_CREDENTIALS = True
 
 CORS_ALLOWED_ORIGINS = [
     'http://localhost:5173',
     'http://127.0.0.1:5173',
     'http://localhost:3000',
+    'http://localhost', # For Nginx production
 ]
+
+CSRF_TRUSTED_ORIGINS = [
+    'http://localhost:5173',
+    'http://127.0.0.1:5173',
+    'http://localhost:3000',
+    'http://localhost',
+]
+# ─────────────────────────────────────────────────────────────
+# LOGGING
+# ─────────────────────────────────────────────────────────────
+LOGGING = {
+    'version': 1,
+    'disable_existing_loggers': False,
+    'formatters': {
+        'verbose': {
+            'format': '{levelname} {asctime} {module} {process:d} {thread:d} {message}',
+            'style': '{',
+        },
+        'simple': {
+            'format': '{levelname} {message}',
+            'style': '{',
+        },
+    },
+    'handlers': {
+        'console': {
+            'class': 'logging.StreamHandler',
+            'formatter': 'simple',
+        },
+        'file': {
+            'level': 'ERROR',
+            'class': 'logging.FileHandler',
+            'filename': BASE_DIR / 'logs/django_error.log',
+            'formatter': 'verbose',
+        },
+    },
+    'loggers': {
+        'django': {
+            'handlers': ['console', 'file'],
+            'level': 'INFO',
+            'propagate': True,
+        },
+    },
+}
+
+# Ensure logs directory exists
+import os
+os.makedirs(BASE_DIR / 'logs', exist_ok=True)

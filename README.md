@@ -42,6 +42,8 @@ GridNest/
 - [x] **Phase 5:** Viewing booking feature (Tenant requests + Landlord approval)
 - [x] **Phase 6:** Admin verification dashboard (Trust & security layer)
 - [x] **Phase 7:** Real-time chat system (Direct messaging between users)
+- [x] **Phase 8:** Production Hardening (Security fixes & performance optimization)
+- [x] **Phase 9:** Deployment & Infrastructure (Docker, PostgreSQL, Nginx)
 
 ---
 
@@ -68,6 +70,32 @@ npm run dev
 
 ---
 
+### 🐳 Run with Docker (Recommended)
+
+The easiest way to start the entire system (Frontend, Backend, Database, and Redis) is using Docker Compose.
+
+1.  **Build and Start:**
+    ```bash
+    docker-compose up --build
+    ```
+
+2.  **Access the Application:**
+    - **Frontend:** [http://localhost](http://localhost) (Port 80)
+    - **Backend API:** [http://localhost:8000/api/](http://localhost:8000/api/)
+    - **Admin Panel:** [http://localhost:8000/admin/](http://localhost:8000/admin/)
+
+3.  **Useful Commands:**
+    - **Create Superuser:**
+      ```bash
+      docker-compose exec backend python manage.py createsuperuser
+      ```
+    - **View Logs:**
+      ```bash
+      docker-compose logs -f backend
+      ```
+
+---
+
 ## 👥 Roles
 
 | Role     | Description                              |
@@ -80,4 +108,4 @@ npm run dev
 
 ## 📄 License
 
-This project is for educational and portfolio purposes.
+This project is for a Saas real time existing software.

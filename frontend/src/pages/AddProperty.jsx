@@ -42,10 +42,12 @@ const AddProperty = () => {
             await api.post('/properties/', data, {
                 headers: { 'Content-Type': 'multipart/form-data' }
             });
-            navigate('/');
+            alert("Listing submitted successfully! It will go live after admin verification.");
+            navigate('/dashboard');
         } catch (error) {
             console.error("Error creating property:", error);
-            alert("Failed to list property. Please check your inputs.");
+            const errorMsg = error.response?.data?.detail || error.response?.data?.message || "Failed to list property. Please check your inputs.";
+            alert(errorMsg);
         } finally {
             setIsLoading(false);
         }

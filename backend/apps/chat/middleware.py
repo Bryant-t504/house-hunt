@@ -26,10 +26,16 @@ class JWTAuthMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        # Extract token from query string
-        query_string = scope.get('query_string', b'').decode()
-        query_params = dict(qp.split('=') for qp in query_string.split('&') if '=' in qp)
-        token = query_params.get('token')
+        # Security Hardening: Move token from query string to Subprotocols
+        # This prevents the JWT from being logged in plain text by web servers/proxies
+        protocols = dict(scope.get('headers', [])).get(b'sec-websocket-protocol', b'').decode().split(', ')
+        token = None
+        
+        # We expect protocol format: ['access_token', '<jwt_value>']
+        if 'access_token' in protocols:
+            token_index = protocols.index('access_token') + 1
+            if token_index < len(protocols):
+                token = protocols[token_index]
 
         if token:
             scope['user'] = await get_user(token)

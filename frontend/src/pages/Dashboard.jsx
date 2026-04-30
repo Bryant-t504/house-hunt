@@ -12,11 +12,11 @@ const Dashboard = () => {
     useEffect(() => {
         fetchBookings();
     }, []);
-
     const fetchBookings = async () => {
         try {
             const response = await api.get('/bookings/');
-            setBookings(response.data);
+            // Fix: Handle paginated response
+            setBookings(response.data.results || response.data);
         } catch (error) {
             console.error("Error fetching bookings:", error);
         } finally {

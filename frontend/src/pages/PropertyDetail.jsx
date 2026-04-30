@@ -104,9 +104,20 @@ const PropertyDetail = () => {
 
                 <div className="space-y-6">
                     <div className="bg-white p-8 rounded-3xl shadow-xl border border-slate-100 sticky top-32">
-                        <div className="flex items-baseline gap-1 mb-8">
-                            <span className="text-4xl font-black text-slate-900">${parseFloat(property.price).toLocaleString()}</span>
+                        <div className="flex items-baseline gap-1 mb-6">
+                            <span className="text-4xl font-black text-slate-900">KSh {parseFloat(property.price).toLocaleString()}</span>
                             <span className="text-slate-500 font-medium">/month</span>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4 mb-8">
+                            <div className="p-4 bg-slate-50 rounded-2xl text-center border border-slate-100">
+                                <p className="text-2xl font-black text-slate-900">{property.bedrooms}</p>
+                                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Bedrooms</p>
+                            </div>
+                            <div className="p-4 bg-slate-50 rounded-2xl text-center border border-slate-100">
+                                <p className="text-2xl font-black text-slate-900">{property.bathrooms}</p>
+                                <p className="text-xs text-slate-500 font-bold uppercase tracking-widest">Bathrooms</p>
+                            </div>
                         </div>
 
                         {bookingSuccess ? (

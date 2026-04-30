@@ -44,11 +44,12 @@ class ConversationListView(generics.ListAPIView):
     def get(self, request, *args, **kwargs):
         user = self.request.user
         
-        # Get all users who have sent me a message or I have sent them one
-        sent_to = Message.objects.filter(sender=user).values_list('receiver', flat=True)
-        received_from = Message.objects.filter(receiver=user).values_list('sender', flat=True)
-        
-        partner_ids = set(list(sent_to) + list(received_from))
-        partners = User.objects.filter(id__in=partner_ids).values('id', 'username', 'role')
+        # Efficiently get all unique users who share a conversation with the current user
+        # Exclude 'self' from the list of partners
+        partners = User.objects.filter(
+            conversations__participants=user
+        ).exclude(
+            id=user.id
+        ).distinct().values('id', 'username', 'role')
         
         return Response(partners)

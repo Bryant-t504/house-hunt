@@ -1,0 +1,31 @@
+{
+  "name": "grid-nest",
+  "version": "1.0.0",
+  "description": "**A PropTech house-hunting platform connecting students, tenants, and landlords.**",
+  "main": "index.js",
+  "scripts": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Bryant-t504/house-hunt.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/Bryant-t504/house-hunt/issues"
+  },
+  "homepage": "https://github.com/Bryant-t504/house-hunt#readme",
+  "devDependencies": {
+    "@playwright/test": "^1.59.1",
+    "@types/node": "^25.6.0"
+  },
+  "directories": {
+    "test": "tests"
+  },
+  "dependencies": {
+    "playwright": "^1.59.1",
+    "playwright-core": "^1.59.1",
+    "undici-types": "^7.19.2"
+  }
+}

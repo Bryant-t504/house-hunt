@@ -1,5 +1,6 @@
 from django.contrib.auth.models import AbstractUser
 from django.db import models
+from django.core.validators import RegexValidator
 
 class User(AbstractUser):
     """
@@ -20,7 +21,19 @@ class User(AbstractUser):
         default=Role.TENANT
     )
     
-    phone_number = models.CharField(max_length=15, blank=True, null=True)
+    email = models.EmailField(unique=True)
+    
+    phone_number = models.CharField(
+        max_length=15, 
+        blank=True, 
+        null=True,
+        validators=[
+            RegexValidator(
+                regex=r'^\d{10,15}$',
+                message="Phone number must be between 10 and 15 digits and contain only numbers."
+            )
+        ]
+    )
     bio = models.TextField(max_length=500, blank=True)
     
     # For security: Landlords must be verified by an admin before their listings go live

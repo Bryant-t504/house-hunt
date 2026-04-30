@@ -5,7 +5,8 @@ from rest_framework_simplejwt.views import (
 )
 from .views import (
     RegisterView, UserProfileView, 
-    AdminLandlordListView, VerifyLandlordView
+    AdminLandlordListView, VerifyLandlordView,
+    LogoutView
 )
 
 urlpatterns = [
@@ -20,6 +21,9 @@ urlpatterns = [
     
     # Profile (View/Update)
     path('profile/', UserProfileView.as_view(), name='user_profile'),
+    
+    # Logout
+    path('logout/', LogoutView.as_view(), name='auth_logout'),
 
     # Admin actions
     path('admin/landlords/', AdminLandlordListView.as_view(), name='admin_landlords'),

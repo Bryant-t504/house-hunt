@@ -20,10 +20,22 @@ const ChatRoom = () => {
 
     // Helper: Create a unique room name for two users (sorted to match backend)
     const getRoomName = (id1, id2) => {
-        return [id1, id2].sort((a, b) => a - b).join('_');
+        // Ensure both are treated as numbers before sorting!
+        return [Number(id1), Number(id2)].sort((a, b) => a - b).join('_');
     };
 
     // 1. Fetch conversation list (sidebar)
+    const fetchConversations = async () => {
+        try {
+            const response = await api.get('/chat/conversations/');
+            // Fix: Handle paginated response
+            setConversations(response.data.results || response.data);
+            setLoading(false);
+        } catch (error) {
+            console.error("Error fetching conversations:", error);
+        }
+    };
+
     useEffect(() => {
         fetchConversations();
     }, []);
@@ -38,16 +50,24 @@ const ChatRoom = () => {
         const token = localStorage.getItem('access_token');
         const roomName = getRoomName(user.id, activeChat);
         
-        // Connect to the WebSocket
+        // Connect to the WebSocket using Sec-WebSocket-Protocol for security
+        // Format: ['access_token', '<jwt_value>']
         const ws = new WebSocket(
-            `ws://localhost:8000/ws/chat/${roomName}/?token=${token}`
+            `ws://localhost:8000/ws/chat/${roomName}/`,
+            ['access_token', token]
         );
 
         ws.onmessage = (e) => {
-            const data = json.loads(e.data);
+            const data = JSON.parse(e.data);
+            
+            if (data.type === 'error') {
+                console.error("Chat error:", data.message);
+                return;
+            }
+
             // Add the new message to the list instantly
             setMessages((prev) => [...prev, {
-                id: Date.now(), // Temp ID for React key
+                id: Date.now() + Math.random(), // Temp unique ID
                 sender: data.sender_id,
                 sender_username: data.sender_username,
                 content: data.message,
@@ -55,6 +75,7 @@ const ChatRoom = () => {
             }]);
         };
 
+        ws.onopen = () => console.log("Connected to room:", roomName);
         ws.onclose = () => console.log("Chat Socket closed");
         ws.onerror = (e) => console.error("Chat Socket error", e);
 
@@ -68,20 +89,11 @@ const ChatRoom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
     }, [messages]);
 
-    const fetchConversations = async () => {
-        try {
-            const response = await api.get('/chat/conversations/');
-            setConversations(response.data);
-            setLoading(false);
-        } catch (error) {
-            console.error("Error fetching conversations:", error);
-        }
-    };
-
     const fetchMessages = async () => {
         try {
             const response = await api.get(`/chat/history/${activeChat}/`);
-            setMessages(response.data);
+            // Fix: Handle paginated response
+            setMessages(response.data.results || response.data);
         } catch (error) {
             console.error("Error fetching messages:", error);
         }
@@ -89,15 +101,20 @@ const ChatRoom = () => {
 
     const handleSendMessage = (e) => {
         e.preventDefault();
-        if (!newMessage.trim() || !socket) return;
+        if (!newMessage.trim() || !socket || socket.readyState !== WebSocket.OPEN) {
+            console.error("Cannot send: Socket not ready");
+            return;
+        }
 
-        // Send the message via WebSocket instead of HTTP!
-        socket.send(JSON.stringify({
-            'message': newMessage,
-            'receiver_id': activeChat
-        }));
-
-        setNewMessage('');
+        try {
+            socket.send(JSON.stringify({
+                'message': newMessage,
+                'receiver_id': activeChat
+            }));
+            setNewMessage('');
+        } catch (err) {
+            console.error("Send failed:", err);
+        }
     };
 
     if (loading) return (
@@ -150,8 +167,8 @@ const ChatRoom = () => {
                                         <User className="w-6 h-6" />
                                     </div>
                                     <span className="font-bold text-slate-900">
-                                        {conversations.find(c => String(c.id) === String(activeChat))?.username || 'Chatting...'}
-                                    </span>
+                                         {conversations.find(c => String(c.id) === String(activeChat))?.username || 'Active Chat'}
+                                     </span>
                                 </div>
                             </div>
 
