@@ -57,6 +57,9 @@ INSTALLED_APPS = [
     'apps.properties',             # Phase 3: Property listings
     'apps.bookings',               # Phase 5: Viewing bookings
     'apps.chat',                   # Phase 7: Real-time chat
+    'apps.verification',
+    'apps.reports',
+    'apps.notifications',
     'channels',                       # Real-time WebSocket support
     'django_filters',                 # For search and filtering
 ]

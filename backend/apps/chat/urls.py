@@ -1,13 +1,19 @@
 from django.urls import path
-from .views import ChatHistoryView, SendMessageView, ConversationListView
+from .views import (
+    ConversationListView,
+    ConversationDetailView,
+    ConversationCreateView,
+    MessageListView,
+    SendMessageView,
+)
 
 urlpatterns = [
-    # List of all people I'm chatting with
+    # Conversation management
     path('conversations/', ConversationListView.as_view(), name='conversation_list'),
+    path('conversations/<int:pk>/', ConversationDetailView.as_view(), name='conversation_detail'),
+    path('conversations/create/', ConversationCreateView.as_view(), name='conversation_create'),
     
-    # Message history with a specific person
-    path('history/<int:other_user_id>/', ChatHistoryView.as_view(), name='chat_history'),
-    
-    # Send a new message
-    path('send/', SendMessageView.as_view(), name='send_message'),
+    # Message management within a specific conversation
+    path('conversations/<int:conversation_id>/messages/', MessageListView.as_view(), name='message_list'),
+    path('conversations/<int:conversation_id>/messages/send/', SendMessageView.as_view(), name='send_message'),
 ]

@@ -2,6 +2,10 @@ from django.urls import re_path
 from . import consumers
 
 websocket_urlpatterns = [
-    # Room name can be a conversation ID or a combined user ID string
-    re_path(r'ws/chat/(?P<room_name>[a-zA-Z0-9_]+)/$', consumers.ChatConsumer.as_asgi()),
+    # Connect to a specific conversation by its integer ID.
+    # Format: ws/chat/conv/<conversation_id>/
+    re_path(
+        r'^ws/chat/conv/(?P<conversation_id>\d+)/$',
+        consumers.ChatConsumer.as_asgi(),
+    ),
 ]

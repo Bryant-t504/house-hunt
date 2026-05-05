@@ -1,123 +1,140 @@
 import json
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
-from .models import Message, Conversation
-from django.contrib.auth import get_user_model
+from django.db.models import Q
 
-User = get_user_model()
+from .models import Message, Conversation
+
 
 class ChatConsumer(AsyncWebsocketConsumer):
     """
-    The Consumer handles the active WebSocket connection.
-    It manages connecting, receiving messages, and broadcasting to others.
+    WebSocket consumer for real-time chat.
+
+    Room name format: `conv_<conversation_id>`
+    e.g.  ws://host/ws/chat/conv_42/
+
+    Security:
+    - Anonymous connections are rejected immediately.
+    - The user must be a verified participant (tenant or landlord) of the
+      requested conversation — enforced in connect() before accepting.
+
+    Schema alignment:
+    - Messages are saved via the Conversation model (no receiver field).
+    - created_at is used instead of the legacy `timestamp` field.
     """
+
     async def connect(self):
-        self.user = self.scope["user"]
-        
-        # If the JWT middleware couldn't find a user, reject the connection
+        self.user = self.scope['user']
+
         if self.user.is_anonymous:
             await self.close()
             return
 
-        # The room name is passed from the frontend (e.g., 'user_1_2')
-        self.room_name = self.scope['url_route']['kwargs']['room_name']
-        self.room_group_name = f'chat_{self.room_name}'
+        # URL pattern: ws/chat/conv_<id>/
+        self.conversation_id = self.scope['url_route']['kwargs']['conversation_id']
+        self.room_group_name = f'chat_conv_{self.conversation_id}'
 
-        # Security: Verify the user is actually part of this room
-        try:
-            ids = self.room_name.split('_')
-            room_user_ids = [int(uid) for uid in ids]
-        except (ValueError, IndexError):
+        # Validate participation before accepting the connection
+        conversation = await self.get_conversation_for_user(self.conversation_id)
+        if not conversation:
+            print(f"[ChatConsumer] Connection rejected: User {self.user.id} is not a participant in conversation {self.conversation_id}")
             await self.close()
             return
 
-        if self.user.id not in room_user_ids:
-            # Reject: this user is not a participant in this room
-            await self.close()
-            return
+        self.conversation = conversation
+        print(f"[ChatConsumer] Connection accepted for {self.user.username} in conversation {self.conversation_id}")
 
-        # Join the unique 'Room Group' for this specific conversation
         await self.channel_layer.group_add(
             self.room_group_name,
-            self.channel_name
+            self.channel_name,
         )
-
         await self.accept()
 
     async def disconnect(self, close_code):
-        # Leave the room group when the user closes the tab or logs out
         if hasattr(self, 'room_group_name'):
             await self.channel_layer.group_discard(
                 self.room_group_name,
-                self.channel_name
+                self.channel_name,
             )
 
-    @database_sync_to_async
-    def save_message(self, receiver_id, content):
-        """
-        Helper to save message to DB inside an async context.
-        Uses atomicity to prevent duplicate conversations.
-        """
-        from django.db import transaction
-        try:
-            with transaction.atomic():
-                receiver = User.objects.get(id=receiver_id)
-                
-                # We sort participant IDs to have a consistent lookup if we wanted a unique key
-                # But here we just use the ManyToMany relationship
-                conversation = Conversation.objects.filter(
-                    participants=self.user
-                ).filter(
-                    participants=receiver
-                ).first()
-                
-                if not conversation:
-                    conversation = Conversation.objects.create()
-                    conversation.participants.add(self.user, receiver)
-                
-                return Message.objects.create(
-                    conversation=conversation,
-                    sender=self.user,
-                    receiver=receiver,
-                    content=content
-                )
-        except Exception as e:
-            print(f"Error saving message: {e}")
-            return None
-
     async def receive(self, text_data):
-        data = json.loads(text_data)
-        message_content = data.get('message', '')
-        receiver_id = data.get('receiver_id')
-
-        if not message_content or not receiver_id:
+        """
+        Incoming WebSocket frame from the browser.
+        Expected payload: {"message": "<text>"}
+        """
+        try:
+            data = json.loads(text_data)
+        except json.JSONDecodeError:
             return
 
-        # Save to database
-        saved_msg = await self.save_message(receiver_id, message_content)
+        message_content = data.get('message', '').strip()
+        if not message_content:
+            return
+
+        saved_msg = await self.save_message(message_content)
 
         if saved_msg:
-            # Broadcast the message
             await self.channel_layer.group_send(
                 self.room_group_name,
                 {
                     'type': 'chat_message',
+                    'message_id': saved_msg.pk,
                     'message': message_content,
                     'sender_id': self.user.id,
                     'sender_username': self.user.username,
-                    'timestamp': saved_msg.timestamp.isoformat()
-                }
+                    'created_at': saved_msg.created_at.isoformat(),
+                },
             )
         else:
-            # Inform the sender that something went wrong
             await self.send(text_data=json.dumps({
                 'type': 'error',
-                'message': 'Failed to send message.'
+                'message': 'Failed to save message. Please try again.',
             }))
 
     async def chat_message(self, event):
         """
-        This method is called when someone broadcasts to the group.
-        It pushes the message out to the actual browser WebSocket.
+        Broadcast handler — pushes the event payload out to the WebSocket client.
         """
         await self.send(text_data=json.dumps(event))
+
+    # ------------------------------------------------------------------ #
+    # DB helpers (run synchronously via database_sync_to_async)
+    # ------------------------------------------------------------------ #
+
+    @database_sync_to_async
+    def get_conversation_for_user(self, conversation_id):
+        """
+        Return the Conversation if the current user is a participant,
+        else return None. Also rejects soft-deleted conversations.
+        """
+        return Conversation.objects.filter(
+            pk=conversation_id,
+            is_deleted=False,
+        ).filter(
+            Q(tenant=self.user) | Q(landlord=self.user)
+        ).first()
+
+    @database_sync_to_async
+    def save_message(self, content):
+        """
+        Persist a Message inside an atomic block.
+        Bumps conversation.updated_at so the thread surfaces at the top of list views.
+        """
+        from django.db import transaction
+        from django.utils import timezone
+
+        try:
+            with transaction.atomic():
+                msg = Message.objects.create(
+                    conversation=self.conversation,
+                    sender=self.user,
+                    content=content,
+                )
+                # Bump conversation's updated_at for ordering in list views
+                Conversation.objects.filter(pk=self.conversation.pk).update(
+                    updated_at=timezone.now()
+                )
+                return msg
+        except Exception as exc:
+            print(f"[ChatConsumer] Error saving message: {exc}")
+            return None

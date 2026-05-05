@@ -14,7 +14,8 @@ def get_user(token):
         access_token = AccessToken(token)
         user_id = access_token['user_id']
         return User.objects.get(id=user_id)
-    except Exception:
+    except Exception as e:
+        print(f"[get_user] Error decoding token: {e}")
         return AnonymousUser()
 
 class JWTAuthMiddleware:
@@ -26,20 +27,38 @@ class JWTAuthMiddleware:
         self.app = app
 
     async def __call__(self, scope, receive, send):
-        # Security Hardening: Move token from query string to Subprotocols
-        # This prevents the JWT from being logged in plain text by web servers/proxies
-        protocols = dict(scope.get('headers', [])).get(b'sec-websocket-protocol', b'').decode().split(', ')
-        token = None
+        # Try to get token from Query String (more robust fallback)
+        query_string = scope.get('query_string', b'').decode()
+        if 'token=' in query_string:
+            from urllib.parse import parse_qs
+            token = parse_qs(query_string).get('token', [None])[0]
+            print(f"[ChatAuth] Found token in query string")
         
-        # We expect protocol format: ['access_token', '<jwt_value>']
-        if 'access_token' in protocols:
-            token_index = protocols.index('access_token') + 1
-            if token_index < len(protocols):
-                token = protocols[token_index]
+        # Fallback to protocols if query string is empty
+        if not token:
+            headers = dict(scope.get('headers', []))
+            protocol_header = headers.get(b'sec-websocket-protocol', b'').decode()
+            protocols = [p.strip() for p in protocol_header.split(',') if p.strip()]
+            
+            try:
+                if 'access_token' in protocols:
+                    token_index = protocols.index('access_token') + 1
+                    if token_index < len(protocols):
+                        token = protocols[token_index]
+                        print(f"[ChatAuth] Found token in protocols")
+            except (ValueError, IndexError):
+                print(f"[ChatAuth] Malformed protocol header")
+                pass
 
         if token:
-            scope['user'] = await get_user(token)
+            user = await get_user(token)
+            scope['user'] = user
+            if user.is_anonymous:
+                print(f"[ChatAuth] Connection rejected: Invalid or expired token")
+            else:
+                print(f"[ChatAuth] User authenticated: {user.username} (ID: {user.id})")
         else:
+            print(f"[ChatAuth] Connection rejected: No 'access_token' found in protocols")
             scope['user'] = AnonymousUser()
 
         return await self.app(scope, receive, send)

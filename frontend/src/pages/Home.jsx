@@ -1,9 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useContext } from 'react';
 import api from '../api/axios';
 import PropertyCard from '../components/PropertyCard';
-import { Loader2, Plus, Search, Filter, X } from 'lucide-react';
-import { Link } from 'react-router-dom';
-import { useContext } from 'react';
+import { LoaderCircle, Search, Filter, X, MapPin, Building2, Home as HomeIcon, LayoutGrid, ChevronDown } from 'lucide-react';
 import AuthContext from '../context/AuthContext';
 
 const Home = () => {
@@ -18,9 +16,8 @@ const Home = () => {
     const [minPrice, setMinPrice] = useState('');
     const [maxPrice, setMaxPrice] = useState('');
     const [bedrooms, setBedrooms] = useState('');
-    const [amenities, setAmenities] = useState('');
     
-    // Pagination State
+    // Pagination
     const [page, setPage] = useState(1);
     const [hasMore, setHasMore] = useState(false);
     const [totalCount, setTotalCount] = useState(0);
@@ -31,7 +28,6 @@ const Home = () => {
         const fetchProperties = async () => {
             setLoading(true);
             try {
-                // Build query params
                 let params = new URLSearchParams();
                 if (search) params.append('search', search);
                 if (typeFilter) params.append('property_type', typeFilter);
@@ -39,12 +35,9 @@ const Home = () => {
                 if (minPrice) params.append('min_price', minPrice);
                 if (maxPrice) params.append('max_price', maxPrice);
                 if (bedrooms) params.append('min_bedrooms', bedrooms);
-                if (amenities) params.append('amenity', amenities);
                 params.append('page', page);
 
                 const response = await api.get(`/properties/?${params.toString()}`);
-                
-                // Fix: Robustly handle paginated or flat response
                 const data = response.data;
                 const results = data.results || (Array.isArray(data) ? data : []);
                 setProperties(results);
@@ -57,217 +50,150 @@ const Home = () => {
             }
         };
 
-        const delayDebounceFn = setTimeout(() => {
-            fetchProperties();
-        }, 300);
+        const timer = setTimeout(fetchProperties, 400);
+        return () => clearTimeout(timer);
+    }, [search, typeFilter, cityFilter, minPrice, maxPrice, bedrooms, page]);
 
-        return () => clearTimeout(delayDebounceFn);
-    }, [search, typeFilter, cityFilter, minPrice, maxPrice, bedrooms, amenities, page]);
-
-    const clearFilters = () => {
-        setSearch('');
-        setTypeFilter('');
-        setCityFilter('');
-        setMinPrice('');
-        setMaxPrice('');
-        setBedrooms('');
-        setAmenities('');
-        setPage(1);
-    };
+    const hasActiveFilters = search || typeFilter || cityFilter || minPrice || maxPrice || bedrooms;
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
-            
-            {/* Hero & Search Section */}
-            <div className="mb-16">
-                <div className="flex flex-col md:flex-row md:items-center justify-between mb-8 gap-6">
-                    <div>
-                        <h1 className="text-4xl font-extrabold text-slate-900 tracking-tight">
-                            Featured <span className="text-primary-600">Nests</span>
+        <div className="min-h-screen bg-primary-50/30">
+            {/* Welcoming Hero */}
+            <section className="pt-24 pb-32 bg-primary-50 border-b border-primary-100/50 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-1/2 h-full bg-gradient-to-l from-white/50 to-transparent pointer-events-none"></div>
+                <div className="container-custom relative z-10">
+                    <div className="max-w-3xl">
+                        <h1 className="text-5xl md:text-7xl font-black text-slate-900 leading-[1.1] mb-8 tracking-tight">
+                            Find a place that <br/>
+                            <span className="text-primary-500 underline decoration-primary-200 underline-offset-8">feels like home</span>
                         </h1>
-                        <p className="text-slate-500 mt-2 text-lg">Discover the best student-friendly homes in Kenya.</p>
-                    </div>
-                    
-                    {user?.role === 'LANDLORD' && (
-                        <Link to="/add-property" className="btn-primary flex items-center gap-2 px-6 py-3">
-                            <Plus className="w-5 h-5" />
-                            List a Property
-                        </Link>
-                    )}
-                </div>
+                        <p className="text-xl text-slate-500 font-medium leading-relaxed mb-12">
+                            Explore a curated collection of verified student homes. Warm, welcoming, and designed for your peace of mind.
+                        </p>
 
-                {/* Search Bar & Filters */}
-                <div className="bg-white p-6 rounded-3xl shadow-xl shadow-slate-200/50 border border-slate-100">
-                    <div className="flex flex-col md:flex-row gap-4 items-center">
-                        <div className="relative flex-1 w-full">
-                            <div className="absolute inset-y-0 left-4 flex items-center pointer-events-none">
-                                <Search className="h-5 w-5 text-slate-400" />
-                            </div>
-                            <input
-                                type="text"
-                                className="block w-full pl-12 pr-4 py-4 bg-slate-50 border-none rounded-2xl focus:ring-2 focus:ring-primary-500 outline-none transition-all"
-                                placeholder="Search by title, city or address..."
-                                value={search}
-                                onChange={(e) => { setSearch(e.target.value); setPage(1); }}
-                            />
-                        </div>
-
-                        <div className="flex items-center gap-4 w-full md:w-auto">
-                            <button 
-                                onClick={() => setShowFilters(!showFilters)}
-                                className={`flex items-center gap-2 px-6 py-4 rounded-2xl transition-all font-medium ${showFilters ? 'bg-primary-600 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200'}`}
-                            >
-                                <Filter className="w-5 h-5" />
-                                Filters
-                            </button>
-                            
-                            {(search || typeFilter || cityFilter || minPrice || maxPrice || bedrooms) && (
-                                <button 
-                                    onClick={clearFilters}
-                                    className="p-4 text-slate-400 hover:text-red-500 hover:bg-red-50 rounded-2xl transition-all"
-                                    title="Clear filters"
-                                >
-                                    <X className="w-6 h-6" />
-                                </button>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Advanced Filters Drawer */}
-                    {showFilters && (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mt-8 pt-8 border-t border-slate-100 animate-in fade-in slide-in-from-top-4">
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-slate-700 ml-1">Location</label>
-                                <select
-                                    className="block w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                                    value={cityFilter}
-                                    onChange={(e) => { setCityFilter(e.target.value); setPage(1); }}
-                                >
-                                    <option value="">All Cities</option>
-                                    <option value="Nairobi">Nairobi</option>
-                                    <option value="Mombasa">Mombasa</option>
-                                    <option value="Kisumu">Kisumu</option>
-                                    <option value="Nakuru">Nakuru</option>
-                                    <option value="Eldoret">Eldoret</option>
-                                </select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-slate-700 ml-1">Property Type</label>
-                                <select
-                                    className="block w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                                    value={typeFilter}
-                                    onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}
-                                >
-                                    <option value="">All Types</option>
-                                    <option value="APARTMENT">Apartments</option>
-                                    <option value="HOUSE">Houses</option>
-                                    <option value="STUDIO">Studios</option>
-                                    <option value="ROOM">Single Rooms</option>
-                                </select>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-slate-700 ml-1">Price Range (KSh)</label>
-                                <div className="flex gap-2 items-center">
-                                    <input 
-                                        type="number" 
-                                        placeholder="Min"
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                                        value={minPrice}
-                                        onChange={(e) => { setMinPrice(e.target.value); setPage(1); }}
-                                    />
-                                    <span className="text-slate-300">-</span>
-                                    <input 
-                                        type="number" 
-                                        placeholder="Max"
-                                        className="w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                                        value={maxPrice}
-                                        onChange={(e) => { setMaxPrice(e.target.value); setPage(1); }}
-                                    />
-                                </div>
-                            </div>
-
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-slate-700 ml-1">Minimum Bedrooms</label>
-                                <select
-                                    className="block w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                                    value={bedrooms}
-                                    onChange={(e) => { setBedrooms(e.target.value); setPage(1); }}
-                                >
-                                    <option value="">Any</option>
-                                    <option value="1">1+</option>
-                                    <option value="2">2+</option>
-                                    <option value="3">3+</option>
-                                    <option value="4">4+</option>
-                                </select>
-                            </div>
-                            <div className="space-y-2">
-                                <label className="text-sm font-semibold text-slate-700 ml-1">Amenities</label>
+                        {/* Search Bar */}
+                        <div className="flex flex-col md:flex-row gap-4 p-2 bg-white rounded-2xl md:rounded-full shadow-saas-xl border border-slate-200 focus-within:ring-8 focus-within:ring-primary-500/5 transition-all mb-8">
+                            <div className="flex-1 flex items-center pl-6 border-b md:border-b-0 md:border-r border-slate-100">
+                                <Search className="w-5 h-5 text-slate-400" />
                                 <input
                                     type="text"
-                                    placeholder="e.g. WiFi, Parking"
-                                    className="block w-full px-4 py-3 bg-slate-50 border-none rounded-xl focus:ring-2 focus:ring-primary-500 outline-none transition-all"
-                                    value={amenities}
-                                    onChange={(e) => { setAmenities(e.target.value); setPage(1); }}
+                                    className="w-full bg-transparent border-none py-4 px-4 text-lg outline-none placeholder:text-slate-400 text-slate-900 font-medium"
+                                    placeholder="City, university, or keyword..."
+                                    value={search}
+                                    onChange={(e) => { setSearch(e.target.value); setPage(1); }}
                                 />
                             </div>
+                            <div className="flex items-center px-4 gap-2">
+                                <button 
+                                    onClick={() => setShowFilters(!showFilters)}
+                                    className={`flex items-center gap-2 px-6 py-3 rounded-full font-bold transition-all ${showFilters ? 'bg-primary-900 text-white shadow-lg' : 'text-slate-600 hover:bg-primary-50'}`}
+                                >
+                                    <Filter size={18} />
+                                    <span>Filters</span>
+                                    <ChevronDown size={16} className={`transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+                                </button>
+                                <button className="bg-primary-600 text-white px-10 py-4 rounded-full font-black shadow-lg shadow-primary-200 hover:bg-primary-700 active:scale-95 transition-all">
+                                    Search
+                                </button>
+                            </div>
                         </div>
-                    )}
-                </div>
-            </div>
 
-            {/* Results Header */}
-            <div className="flex items-center justify-between mb-8">
-                <p className="text-slate-500 font-medium">
-                    Showing <span className="text-slate-900">{properties.length}</span> of <span className="text-slate-900">{totalCount}</span> properties
-                </p>
-            </div>
+                        {/* Advanced Filters Drawer */}
+                        <div className={`overflow-hidden transition-all duration-500 ease-in-out ${showFilters ? 'max-h-[600px] opacity-100 mt-4' : 'max-h-0 opacity-0'}`}>
+                            <div className="bg-white rounded-[2rem] p-8 border border-slate-200 shadow-saas-lg">
+                                <div className="flex justify-between items-center mb-8">
+                                    <h3 className="text-lg font-black text-slate-900 flex items-center gap-3">
+                                        <LayoutGrid className="text-primary-600" size={20} /> Fine-tune your search
+                                    </h3>
+                                    {hasActiveFilters && (
+                                        <button onClick={() => { setSearch(''); setTypeFilter(''); setCityFilter(''); setMinPrice(''); setMaxPrice(''); setBedrooms(''); }} className="text-xs font-black text-primary-500 hover:text-primary-600 uppercase tracking-widest flex items-center gap-2">
+                                            <X size={14} /> Reset Filters
+                                        </button>
+                                    )}
+                                </div>
+                                
+                                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Location</label>
+                                        <div className="relative">
+                                            <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} />
+                                            <select className="input-saas pl-11 py-2.5 bg-slate-50 border-transparent text-sm" value={cityFilter} onChange={(e) => { setCityFilter(e.target.value); setPage(1); }}>
+                                                <option value="">Any City</option>
+                                                {['Nairobi', 'Mombasa', 'Kisumu', 'Nakuru', 'Eldoret'].map(c => <option key={c} value={c}>{c}</option>)}
+                                            </select>
+                                        </div>
+                                    </div>
 
-            {/* Content Grid */}
-            {loading ? (
-                <div className="flex flex-col items-center justify-center py-20 gap-4">
-                    <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
-                    <p className="text-slate-500 font-medium">Hunting for properties...</p>
-                </div>
-            ) : properties.length > 0 ? (
-                <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 mb-12">
-                        {properties.map(property => (
-                            <PropertyCard key={property.id} property={property} />
-                        ))}
-                    </div>
-                    
-                    {/* Pagination Controls */}
-                    {(page > 1 || hasMore) && (
-                        <div className="flex items-center justify-center gap-4 py-8">
-                            <button 
-                                onClick={() => setPage(p => Math.max(1, p - 1))}
-                                disabled={page === 1}
-                                className="px-6 py-3 bg-white border border-slate-200 rounded-xl font-semibold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-all"
-                            >
-                                Previous
-                            </button>
-                            <span className="text-slate-500 font-bold">Page {page}</span>
-                            <button 
-                                onClick={() => setPage(p => p + 1)}
-                                disabled={!hasMore}
-                                className="px-6 py-3 bg-white border border-slate-200 rounded-xl font-semibold text-slate-600 disabled:opacity-50 disabled:cursor-not-allowed hover:bg-slate-50 transition-all"
-                            >
-                                Next
-                            </button>
+                                    <div className="space-y-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Property Type</label>
+                                        <div className="relative">
+                                            <Building2 className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300 pointer-events-none" size={16} />
+                                            <select className="input-saas pl-11 py-2.5 bg-slate-50 border-transparent text-sm" value={typeFilter} onChange={(e) => { setTypeFilter(e.target.value); setPage(1); }}>
+                                                <option value="">Any Type</option>
+                                                <option value="apartment">Apartments</option>
+                                                <option value="house">Houses</option>
+                                                <option value="studio">Studios</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div className="space-y-2 sm:col-span-2">
+                                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Price Range (KSh)</label>
+                                        <div className="flex gap-3 items-center">
+                                            <input type="number" placeholder="Min" className="input-saas py-2.5 bg-slate-50 border-transparent text-sm" value={minPrice} onChange={(e) => { setMinPrice(e.target.value); setPage(1); }} />
+                                            <div className="w-4 h-0.5 bg-slate-200"></div>
+                                            <input type="number" placeholder="Max" className="input-saas py-2.5 bg-slate-50 border-transparent text-sm" value={maxPrice} onChange={(e) => { setMaxPrice(e.target.value); setPage(1); }} />
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
-                    )}
-                </>
-            ) : (
-                <div className="text-center py-20 bg-white rounded-3xl border-2 border-dashed border-slate-100">
-                    <div className="inline-flex items-center justify-center w-20 h-20 bg-slate-50 rounded-full mb-6">
-                        <Plus className="w-10 h-10 text-slate-300" />
                     </div>
-                    <h3 className="text-2xl font-bold text-slate-900">No results found</h3>
-                    <p className="text-slate-500 mt-2">Try adjusting your filters or search keywords.</p>
                 </div>
-            )}
+            </section>
+
+            <main className="container-custom py-20">
+                {/* Grid Header */}
+                <div className="flex flex-col md:flex-row md:items-end justify-between mb-16 gap-6">
+                    <div>
+                        <h2 className="text-3xl font-black text-slate-900 mb-2 tracking-tight">Discovery Queue</h2>
+                        <p className="text-slate-500 font-medium">Found {totalCount} properties waiting for you</p>
+                    </div>
+                    <div className="flex gap-2">
+                        <span className="p-3 bg-primary-50 text-primary-600 rounded-xl font-black text-sm">Sort: Newest First</span>
+                    </div>
+                </div>
+
+                {/* Results */}
+                {loading ? (
+                    <div className="flex flex-col items-center justify-center py-40 gap-6">
+                        <div className="w-16 h-16 border-4 border-slate-100 border-t-primary-600 rounded-full animate-spin"></div>
+                        <p className="text-slate-400 font-black uppercase tracking-widest text-sm">Mapping the neighborhood...</p>
+                    </div>
+                ) : properties.length > 0 ? (
+                    <>
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-10">
+                            {properties.map(p => <PropertyCard key={p.id} property={p} />)}
+                        </div>
+                        
+                        {/* Pagination */}
+                        {(page > 1 || hasMore) && (
+                            <div className="flex items-center justify-center gap-6 mt-24">
+                                <button onClick={() => setPage(p => Math.max(1, p - 1))} disabled={page === 1} className="btn-secondary px-8 disabled:opacity-30">Previous</button>
+                                <span className="font-black text-slate-900">Page {page}</span>
+                                <button onClick={() => setPage(p => p + 1)} disabled={!hasMore} className="btn-secondary px-8 disabled:opacity-30">Next</button>
+                            </div>
+                        )}
+                    </>
+                ) : (
+                    <div className="text-center py-40 border-4 border-dashed border-slate-100 rounded-[3rem]">
+                        <Search className="w-16 h-16 mx-auto mb-8 text-slate-200" />
+                        <h3 className="text-3xl font-black text-slate-900 mb-2">No properties matched</h3>
+                        <p className="text-slate-500 font-medium mb-10 max-w-sm mx-auto">Try adjusting your filters or search keywords to find more options.</p>
+                        {hasActiveFilters && <button onClick={() => { setSearch(''); setTypeFilter(''); setCityFilter(''); setMinPrice(''); setMaxPrice(''); setBedrooms(''); }} className="btn-primary">Clear all filters</button>}
+                    </div>
+                )}
+            </main>
         </div>
     );
 };

@@ -1,14 +1,11 @@
 import { useState, useContext } from 'react';
 import { Link } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
-import { LogIn, Mail, Lock, Loader2 } from 'lucide-react';
+import { LogIn, User, Lock, LoaderCircle, Home } from 'lucide-react';
 
 const Login = () => {
     const { loginUser } = useContext(AuthContext);
-    const [formData, setFormData] = useState({
-        username: '',
-        password: ''
-    });
+    const [formData, setFormData] = useState({ username: '', password: '' });
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
@@ -16,85 +13,52 @@ const Login = () => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
-
         const result = await loginUser(formData);
-        
-        if (!result.success) {
-            setError(result.message);
-        }
+        if (!result.success) setError(result.message);
         setIsLoading(false);
     };
 
     return (
-        <div className="min-h-[80vh] flex items-center justify-center px-4">
-            <div className="max-w-md w-full bg-white rounded-2xl shadow-xl border border-slate-100 p-8">
-                <div className="text-center mb-8">
-                    <div className="inline-flex items-center justify-center w-16 h-16 bg-primary-50 rounded-full mb-4">
-                        <LogIn className="w-8 h-8 text-primary-600" />
+        <div className="min-h-[85vh] flex items-center justify-center bg-primary-50/20 px-4">
+            <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-saas-xl border border-primary-100/50 p-12 animate-in fade-in zoom-in-95">
+                <div className="text-center mb-10">
+                    <div className="inline-flex items-center justify-center w-20 h-20 bg-primary-50 rounded-[1.5rem] mb-6">
+                        <Home className="w-10 h-10 text-primary-600" />
                     </div>
-                    <h2 className="text-3xl font-bold text-slate-900">Welcome Back</h2>
-                    <p className="text-slate-500 mt-2">Log in to manage your GridNest account</p>
+                    <h2 className="text-3xl font-black text-slate-900 tracking-tight">Welcome back</h2>
+                    <p className="text-slate-500 font-medium mt-2">Manage your listings and stays</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-6">
-                    {error && (
-                        <div className="bg-red-50 text-red-600 p-3 rounded-lg text-sm border border-red-100">
-                            {error}
-                        </div>
-                    )}
+                    {error && <div className="bg-rose-50 text-rose-600 p-4 rounded-2xl text-sm font-bold border border-rose-100">{error}</div>}
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Username</label>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Username</label>
                         <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Mail className="h-5 w-5 text-slate-400" />
-                            </div>
-                            <input
-                                type="text"
-                                required
-                                className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
-                                placeholder="Enter your username"
-                                value={formData.username}
-                                onChange={(e) => setFormData({...formData, username: e.target.value})}
-                            />
+                            <User className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                            <input type="text" required className="input-saas pl-12" placeholder="your_username" value={formData.username} onChange={(e) => setFormData({...formData, username: e.target.value})} />
                         </div>
                     </div>
 
-                    <div>
-                        <label className="block text-sm font-medium text-slate-700 mb-2">Password</label>
+                    <div className="space-y-1.5">
+                        <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Password</label>
                         <div className="relative">
-                            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                <Lock className="h-5 w-5 text-slate-400" />
-                            </div>
-                            <input
-                                type="password"
-                                required
-                                className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 focus:border-transparent transition-all outline-none"
-                                placeholder="••••••••"
-                                value={formData.password}
-                                onChange={(e) => setFormData({...formData, password: e.target.value})}
-                            />
+                            <Lock className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                            <input type="password" required className="input-saas pl-12" placeholder="••••••••" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
                         </div>
                     </div>
 
                     <button
                         type="submit"
                         disabled={isLoading}
-                        className="w-full btn-primary py-3 flex items-center justify-center gap-2 text-lg font-semibold"
+                        className="w-full btn-primary py-4 text-lg shadow-xl shadow-primary-200 mt-4 flex items-center justify-center gap-2"
                     >
-                        {isLoading ? (
-                            <Loader2 className="w-5 h-5 animate-spin" />
-                        ) : (
-                            'Sign In'
-                        )}
+                        {isLoading ? <LoaderCircle className="w-6 h-6 animate-spin" /> : 'Log In'}
                     </button>
                 </form>
 
-                <p className="mt-8 text-center text-slate-600">
-                    Don't have an account?{' '}
-                    <Link to="/register" className="text-primary-600 font-semibold hover:underline">
-                        Create one now
-                    </Link>
+                <p className="mt-10 text-center text-slate-500 font-medium">
+                    New to GridNest? <Link to="/register" className="text-primary-600 font-black hover:underline">Join Now</Link>
                 </p>
             </div>
         </div>

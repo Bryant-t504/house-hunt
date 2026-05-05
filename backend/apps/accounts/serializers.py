@@ -11,7 +11,7 @@ class UserSerializer(serializers.ModelSerializer):
     """
     class Meta:
         model = User
-        fields = ('id', 'username', 'email', 'role', 'phone_number', 'bio', 'is_verified', 'is_staff')
+        fields = ('id', 'username', 'email', 'role', 'phone_number', 'first_name', 'last_name', 'is_verified', 'is_staff')
         read_only_fields = ('role', 'is_verified', 'is_staff') # Users can't make themselves admins!
 
 class RegisterSerializer(serializers.ModelSerializer):
@@ -35,8 +35,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         if User.objects.filter(email=attrs['email']).exists():
             raise serializers.ValidationError({"email": "A user with this email already exists."})
             
-        # Security: Prevent unauthorized role assignment (only Tenant or Landlord allowed)
-        role = attrs.get('role', 'TENANT')
+        # Security: Prevent unauthorized role assignment (only tenant or landlord allowed)
+        role = attrs.get('role', 'tenant')
         if role not in [User.Role.TENANT, User.Role.LANDLORD]:
             attrs['role'] = User.Role.TENANT # Force to Tenant if invalid/Admin
 
@@ -46,7 +46,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Remove the password_confirm field
         validated_data.pop('password_confirm')
         
-        # Use the provided role, default to TENANT
+        # Use the provided role, default to tenant
         role = validated_data.get('role', User.Role.TENANT)
         
         user = User.objects.create_user(

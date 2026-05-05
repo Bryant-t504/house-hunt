@@ -2,7 +2,7 @@ import { useState, useEffect, useContext, useRef } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
-import { Send, User, Loader2, MessageSquare } from 'lucide-react';
+import { Send, User, LoaderCircle, MessageSquare, Info, MoreVertical, Building2, Wifi, WifiOff, ChevronLeft, Search } from 'lucide-react';
 
 const ChatRoom = () => {
     const { user } = useContext(AuthContext);
@@ -10,209 +10,177 @@ const ChatRoom = () => {
     const navigate = useNavigate();
     
     const [conversations, setConversations] = useState([]);
-    const [activeChat, setActiveChat] = useState(searchParams.get('with') || null);
+    const [activeConversationId, setActiveConversationId] = useState(null);
     const [messages, setMessages] = useState([]);
     const [newMessage, setNewMessage] = useState('');
     const [loading, setLoading] = useState(true);
     const [socket, setSocket] = useState(null);
-    
+    const [connectionStatus, setConnectionStatus] = useState('disconnected');
+    const [closeCode, setCloseCode] = useState(null);
     const messagesEndRef = useRef(null);
 
-    // Helper: Create a unique room name for two users (sorted to match backend)
-    const getRoomName = (id1, id2) => {
-        // Ensure both are treated as numbers before sorting!
-        return [Number(id1), Number(id2)].sort((a, b) => a - b).join('_');
-    };
-
-    // 1. Fetch conversation list (sidebar)
     const fetchConversations = async () => {
         try {
             const response = await api.get('/chat/conversations/');
-            // Fix: Handle paginated response
-            setConversations(response.data.results || response.data);
-            setLoading(false);
-        } catch (error) {
-            console.error("Error fetching conversations:", error);
-        }
+            const data = response.data.results || response.data;
+            setConversations(data);
+            return data;
+        } catch (error) { return []; }
+        finally { setLoading(false); }
     };
 
     useEffect(() => {
-        fetchConversations();
-    }, []);
+        const initChat = async () => {
+            const currentConversations = await fetchConversations();
+            const withId = searchParams.get('with');
+            const propertyId = searchParams.get('property');
 
-    // 2. Manage WebSocket Connection
+            if (withId && propertyId) {
+                try {
+                    const res = await api.post('/chat/conversations/create/', { landlord: withId, property: propertyId });
+                    setActiveConversationId(res.data.id);
+                    fetchConversations();
+                } catch (err) { console.error(err); }
+            } else if (currentConversations.length > 0 && !activeConversationId) {
+                setActiveConversationId(currentConversations[0].id);
+            }
+        };
+        initChat();
+    }, [searchParams]);
+
     useEffect(() => {
-        if (!activeChat || !user) return;
-
-        // Fetch history first
-        fetchMessages();
+        if (!activeConversationId || !user) return;
+        fetchMessages(activeConversationId);
 
         const token = localStorage.getItem('access_token');
-        const roomName = getRoomName(user.id, activeChat);
-        
-        // Connect to the WebSocket using Sec-WebSocket-Protocol for security
-        // Format: ['access_token', '<jwt_value>']
-        const ws = new WebSocket(
-            `ws://localhost:8000/ws/chat/${roomName}/`,
-            ['access_token', token]
-        );
+        const ws = new WebSocket(`ws://127.0.0.1:8000/ws/chat/conv/${activeConversationId}/?token=${token}`);
 
+        ws.onopen = () => setConnectionStatus('connected');
         ws.onmessage = (e) => {
             const data = JSON.parse(e.data);
-            
-            if (data.type === 'error') {
-                console.error("Chat error:", data.message);
-                return;
+            if (data.type === 'chat_message') {
+                setMessages(prev => [...prev, { id: data.message_id, sender: data.sender_id, sender_username: data.sender_username, content: data.message, created_at: data.created_at }]);
             }
-
-            // Add the new message to the list instantly
-            setMessages((prev) => [...prev, {
-                id: Date.now() + Math.random(), // Temp unique ID
-                sender: data.sender_id,
-                sender_username: data.sender_username,
-                content: data.message,
-                timestamp: data.timestamp
-            }]);
         };
-
-        ws.onopen = () => console.log("Connected to room:", roomName);
-        ws.onclose = () => console.log("Chat Socket closed");
-        ws.onerror = (e) => console.error("Chat Socket error", e);
-
+        ws.onerror = () => setConnectionStatus('error');
+        ws.onclose = (e) => { setConnectionStatus('disconnected'); setCloseCode(e.code); };
+        
         setSocket(ws);
-
-        // Cleanup on unmount or chat switch
         return () => ws.close();
-    }, [activeChat, user]);
+    }, [activeConversationId, user]);
 
-    useEffect(() => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-    }, [messages]);
+    useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-    const fetchMessages = async () => {
+    const fetchMessages = async (convId) => {
         try {
-            const response = await api.get(`/chat/history/${activeChat}/`);
-            // Fix: Handle paginated response
+            const response = await api.get(`/chat/conversations/${convId}/messages/`);
             setMessages(response.data.results || response.data);
-        } catch (error) {
-            console.error("Error fetching messages:", error);
-        }
+        } catch (error) { console.error(error); }
     };
 
     const handleSendMessage = (e) => {
         e.preventDefault();
-        if (!newMessage.trim() || !socket || socket.readyState !== WebSocket.OPEN) {
-            console.error("Cannot send: Socket not ready");
-            return;
-        }
-
-        try {
-            socket.send(JSON.stringify({
-                'message': newMessage,
-                'receiver_id': activeChat
-            }));
-            setNewMessage('');
-        } catch (err) {
-            console.error("Send failed:", err);
-        }
+        if (!newMessage.trim() || !socket || socket.readyState !== WebSocket.OPEN) return;
+        socket.send(JSON.stringify({ 'message': newMessage }));
+        setNewMessage('');
     };
 
-    if (loading) return (
-        <div className="min-h-[80vh] flex items-center justify-center">
-            <Loader2 className="w-12 h-12 text-primary-600 animate-spin" />
-        </div>
-    );
+    if (loading) return <div className="min-h-screen flex items-center justify-center"><LoaderCircle className="w-12 h-12 text-primary-600 animate-spin" /></div>;
+
+    const activeConversation = conversations.find(c => c.id === activeConversationId);
+    const partnerName = activeConversation ? (user.id === activeConversation.tenant ? activeConversation.landlord_username : activeConversation.tenant_username) : 'Select Chat';
 
     return (
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 h-[calc(100vh-120px)]">
-            <div className="bg-white h-full rounded-3xl shadow-xl border border-slate-100 overflow-hidden flex">
-                
-                {/* Sidebar */}
-                <div className="w-80 border-r border-slate-100 flex flex-col bg-slate-50/50">
-                    <div className="p-6 border-b border-slate-100 bg-white">
-                        <h2 className="text-xl font-bold text-slate-900 flex items-center gap-2">
-                            <MessageSquare className="w-5 h-5 text-primary-600" />
-                            Messages
-                        </h2>
-                    </div>
-                    <div className="flex-1 overflow-y-auto">
-                        {conversations.map(partner => (
-                            <button
-                                key={partner.id}
-                                onClick={() => {
-                                    setActiveChat(partner.id);
-                                    navigate('/chat', { replace: true });
-                                }}
-                                className={`w-full p-6 text-left hover:bg-white transition-all border-b border-slate-100/50 flex items-center gap-4 ${activeChat == partner.id ? 'bg-white border-l-4 border-l-primary-600 shadow-sm' : ''}`}
-                            >
-                                <div className="w-12 h-12 bg-primary-100 rounded-2xl flex items-center justify-center text-primary-700 font-bold">
-                                    {partner.username[0].toUpperCase()}
-                                </div>
-                                <div>
-                                    <p className="font-bold text-slate-900">{partner.username}</p>
-                                    <p className="text-xs text-slate-500 uppercase font-semibold">{partner.role}</p>
-                                </div>
-                            </button>
-                        ))}
-                    </div>
-                </div>
-
-                {/* Chat Area */}
-                <div className="flex-1 flex flex-col bg-white">
-                    {activeChat ? (
-                        <>
-                            <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-                                <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-slate-100 rounded-xl flex items-center justify-center text-slate-500 font-bold">
-                                        <User className="w-6 h-6" />
-                                    </div>
-                                    <span className="font-bold text-slate-900">
-                                         {conversations.find(c => String(c.id) === String(activeChat))?.username || 'Active Chat'}
-                                     </span>
-                                </div>
+        <div className="bg-primary-50/50 min-h-[calc(100vh-80px)]">
+            <div className="container-custom py-8 h-[calc(100vh-120px)]">
+                <div className="bg-white rounded-[2.5rem] shadow-saas-xl flex h-full overflow-hidden border border-primary-100/50">
+                    
+                    {/* Sidebar */}
+                    <div className={`w-full md:w-80 lg:w-96 border-r border-slate-100 flex flex-col ${activeConversationId ? 'hidden md:flex' : 'flex'}`}>
+                        <div className="p-8 border-b border-slate-100">
+                            <h2 className="text-2xl font-black text-slate-900 mb-6 flex items-center gap-2">Inbox</h2>
+                            <div className="relative">
+                                <Search className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                <input type="text" placeholder="Search conversations..." className="input-saas pl-12 py-3 text-sm bg-slate-50 border-none" />
                             </div>
+                        </div>
+                        <div className="flex-1 overflow-y-auto bg-slate-50/30">
+                            {conversations.length > 0 ? conversations.map(conv => (
+                                <button key={conv.id} onClick={() => setActiveConversationId(conv.id)} className={`w-full p-6 text-left transition-all flex items-center gap-4 border-b border-primary-100/30 ${activeConversationId === conv.id ? 'bg-primary-50/50 shadow-inner' : 'hover:bg-primary-50/30'}`}>
+                                    <div className="w-14 h-14 bg-white rounded-2xl flex items-center justify-center text-primary-600 font-black text-xl shadow-sm border border-primary-100/50">
+                                        {(user.id === conv.tenant ? conv.landlord_username : conv.tenant_username)?.[0]?.toUpperCase()}
+                                    </div>
+                                    <div className="flex-1 min-w-0">
+                                        <p className="font-black text-slate-900 truncate">{user.id === conv.tenant ? conv.landlord_username : conv.tenant_username}</p>
+                                        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest truncate mt-1 flex items-center gap-1">
+                                            <Building2 size={10} /> {conv.property_title || 'General'}
+                                        </p>
+                                    </div>
+                                </button>
+                            )) : <div className="p-12 text-center text-slate-300 font-bold">No messages yet</div>}
+                        </div>
+                    </div>
 
-                            <div className="flex-1 overflow-y-auto p-6 space-y-4 bg-slate-50/30">
-                                {messages.map(msg => {
-                                    const isMe = String(msg.sender?.id || msg.sender) === String(user.id);
-                                    return (
-                                        <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'}`}>
-                                            <div className={`flex max-w-[80%] gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
-                                                <div className={`w-8 h-8 rounded-full flex-shrink-0 flex items-center justify-center text-xs font-bold ${isMe ? 'bg-primary-100 text-primary-700' : 'bg-white text-slate-400 border border-slate-100'}`}>
-                                                    {isMe ? 'Me' : (msg.sender_username?.[0]?.toUpperCase() || '?')}
-                                                </div>
-                                                <div className={`p-4 rounded-2xl shadow-sm ${isMe ? 'bg-primary-600 text-white rounded-tr-none' : 'bg-white text-slate-700 border border-slate-100 rounded-tl-none'}`}>
-                                                    <p className="text-sm leading-relaxed">{msg.content}</p>
-                                                    <p className={`text-[10px] mt-2 opacity-50 ${isMe ? 'text-white' : 'text-slate-500'}`}>
-                                                        {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                                                    </p>
+                    {/* Chat Window */}
+                    <div className={`flex-1 flex flex-col bg-white ${!activeConversationId ? 'hidden md:flex' : 'flex'}`}>
+                        {activeConversationId ? (
+                            <>
+                                {/* Header */}
+                                <div className="p-6 border-b border-slate-100 flex items-center justify-between shadow-sm z-10">
+                                    <div className="flex items-center gap-4">
+                                        <button onClick={() => setActiveConversationId(null)} className="md:hidden p-2 text-slate-400"><ChevronLeft /></button>
+                                        <div className="w-12 h-12 bg-primary-100 text-primary-900 rounded-2xl flex items-center justify-center font-black text-lg">
+                                            {partnerName[0].toUpperCase()}
+                                        </div>
+                                        <div>
+                                            <div className="flex items-center gap-2">
+                                                <h3 className="font-black text-slate-900 text-lg">{partnerName}</h3>
+                                                <span className={`w-2 h-2 rounded-full ${connectionStatus === 'connected' ? 'bg-emerald-500 animate-pulse' : 'bg-rose-500'}`}></span>
+                                            </div>
+                                            <p className="text-xs font-bold text-slate-400">{activeConversation?.property_title || 'Property Inquiry'}</p>
+                                        </div>
+                                    </div>
+                                    <button className="p-3 text-slate-300 hover:text-slate-600 transition-colors"><MoreVertical /></button>
+                                </div>
+
+                                {/* Messages */}
+                                <div className="flex-1 overflow-y-auto p-8 space-y-8 bg-slate-50/20">
+                                    {messages.map(msg => {
+                                        const isMe = String(msg.sender?.id || msg.sender) === String(user.id);
+                                        return (
+                                            <div key={msg.id} className={`flex w-full ${isMe ? 'justify-end' : 'justify-start'} animate-in fade-in slide-in-from-bottom-2`}>
+                                                <div className={`flex max-w-[80%] md:max-w-[60%] gap-3 ${isMe ? 'flex-row-reverse' : 'flex-row'}`}>
+                                                    <div className={`p-5 shadow-sm ${isMe ? 'bg-primary-900 text-white rounded-[2rem] rounded-tr-lg' : 'bg-white text-slate-700 border border-primary-100/50 rounded-[2rem] rounded-tl-lg'}`}>
+                                                        <p className="text-[15px] leading-relaxed font-medium">{msg.content}</p>
+                                                        <p className={`text-[10px] font-black mt-2 opacity-50 ${isMe ? 'text-right' : 'text-left'}`}>
+                                                            {new Date(msg.created_at || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                                                        </p>
+                                                    </div>
                                                 </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
-                                <div ref={messagesEndRef} />
-                            </div>
+                                        );
+                                    })}
+                                    <div ref={messagesEndRef} />
+                                </div>
 
-                            <form onSubmit={handleSendMessage} className="p-6 border-t border-slate-100 flex gap-4">
-                                <input
-                                    type="text"
-                                    placeholder="Type your message..."
-                                    className="flex-1 bg-slate-50 border-none rounded-2xl px-6 py-4 outline-none focus:ring-2 focus:ring-primary-500"
-                                    value={newMessage}
-                                    onChange={(e) => setNewMessage(e.target.value)}
-                                />
-                                <button type="submit" className="btn-primary p-4 rounded-2xl shadow-lg shadow-primary-200">
-                                    <Send className="w-6 h-6" />
-                                </button>
-                            </form>
-                        </>
-                    ) : (
-                        <div className="flex-1 flex flex-col items-center justify-center text-slate-400">
-                            <MessageSquare className="w-16 h-16 mb-4 opacity-10" />
-                            <p>Select a chat to start messaging</p>
-                        </div>
-                    )}
+                                {/* Input */}
+                                <div className="p-6 bg-white border-t border-primary-100/30">
+                                    <form onSubmit={handleSendMessage} className="flex gap-4 items-center bg-primary-50/50 p-2 pl-6 rounded-3xl border border-primary-100/50 focus-within:ring-8 focus-within:ring-primary-500/5 transition-all duration-300">
+                                        <input type="text" placeholder="Type a message..." disabled={connectionStatus !== 'connected'} className="flex-1 bg-transparent border-none outline-none font-bold text-slate-700 placeholder:text-slate-400 disabled:opacity-50" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} />
+                                        <button type="submit" disabled={!newMessage.trim() || connectionStatus !== 'connected'} className="bg-primary-900 text-white p-4 rounded-[1.5rem] shadow-lg shadow-primary-900/10 hover:bg-black transition-all active:scale-95 disabled:opacity-30">
+                                            <Send size={20} />
+                                        </button>
+                                    </form>
+                                </div>
+                            </>
+                        ) : (
+                            <div className="flex-1 flex flex-col items-center justify-center text-center p-12">
+                                <div className="w-24 h-24 bg-slate-50 text-slate-200 rounded-[2rem] flex items-center justify-center mb-8"><MessageSquare size={48} /></div>
+                                <h3 className="text-3xl font-black text-slate-900 mb-2">Your Conversations</h3>
+                                <p className="text-slate-400 font-medium max-w-xs">Select a contact from the left to start chatting about properties.</p>
+                            </div>
+                        )}
+                    </div>
                 </div>
             </div>
         </div>

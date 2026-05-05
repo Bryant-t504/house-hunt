@@ -1,183 +1,144 @@
-import { useState, useContext } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useState, useContext, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import AuthContext from '../context/AuthContext';
 import api from '../api/axios';
-import { Upload, DollarSign, MapPin, Type, FileText, Loader2 } from 'lucide-react';
+import { Upload, DollarSign, MapPin, Type, FileText, LoaderCircle, Building2, BedDouble, Bath, ChevronLeft } from 'lucide-react';
 
 const AddProperty = () => {
     const { user } = useContext(AuthContext);
     const navigate = useNavigate();
+    const [searchParams] = useSearchParams();
+    const editId = searchParams.get('edit');
+    
     const [isLoading, setIsLoading] = useState(false);
     const [formData, setFormData] = useState({
-        title: '',
-        description: '',
-        address: '',
-        city: 'Nairobi',
-        price: '',
-        property_type: 'APARTMENT',
-        image: null
+        title: '', description: '', location: '', price: '', bedrooms: 1, bathrooms: 1, property_type: 'apartment', image: null
     });
 
-    // If not a landlord, they shouldn't be here
-    if (user?.role !== 'LANDLORD') {
-        navigate('/');
-        return null;
-    }
+    useEffect(() => {
+        if (editId) {
+            const fetchProp = async () => {
+                try {
+                    const res = await api.get(`/properties/${editId}/`);
+                    const p = res.data;
+                    setFormData({ ...p, image: null }); // Don't try to prepopulate file
+                } catch (e) { console.error(e); }
+            };
+            fetchProp();
+        }
+    }, [editId]);
+
+    if (user?.role !== 'landlord') { navigate('/'); return null; }
 
     const handleSubmit = async (e) => {
         e.preventDefault();
         setIsLoading(true);
-
-        // We use FormData for image uploads
         const data = new FormData();
-        Object.keys(formData).forEach(key => {
-            if (key === 'image' && formData[key]) {
-                data.append('image', formData[key]);
-            } else {
-                data.append(key, formData[key]);
-            }
+        Object.keys(formData).forEach(k => {
+            if (k === 'image' && formData[k]) data.append('image', formData[k]);
+            else if (formData[k] !== null && formData[k] !== '') data.append(k, formData[k]);
         });
 
         try {
-            await api.post('/properties/', data, {
-                headers: { 'Content-Type': 'multipart/form-data' }
-            });
-            alert("Listing submitted successfully! It will go live after admin verification.");
+            if (editId) await api.patch(`/properties/${editId}/`, data);
+            else await api.post('/properties/', data);
             navigate('/dashboard');
-        } catch (error) {
-            console.error("Error creating property:", error);
-            const errorMsg = error.response?.data?.detail || error.response?.data?.message || "Failed to list property. Please check your inputs.";
-            alert(errorMsg);
-        } finally {
-            setIsLoading(false);
-        }
+        } catch (error) { alert("Failed to save property. Please check all fields."); }
+        finally { setIsLoading(false); }
     };
 
     return (
-        <div className="max-w-4xl mx-auto px-4 py-12">
-            <div className="bg-white rounded-3xl shadow-xl border border-slate-100 overflow-hidden">
-                <div className="bg-primary-600 p-8 text-white">
-                    <h1 className="text-3xl font-bold">List Your Property</h1>
-                    <p className="opacity-90 mt-2">Fill in the details below to attract the best tenants.</p>
+        <div className="min-h-screen bg-primary-50/20 py-20 px-4">
+            <div className="max-w-4xl mx-auto">
+                <button onClick={() => navigate(-1)} className="flex items-center gap-2 text-slate-400 font-bold hover:text-slate-900 transition-colors mb-8 uppercase text-[10px] tracking-widest">
+                    <ChevronLeft size={16} /> Back to Dashboard
+                </button>
+
+                <div className="bg-white rounded-[3rem] shadow-saas-xl border border-primary-100/50 overflow-hidden animate-in fade-in zoom-in-95">
+                    <div className="bg-primary-900 p-12 text-white">
+                        <h1 className="text-4xl font-black tracking-tight mb-2">{editId ? 'Edit Listing' : 'List Your Property'}</h1>
+                        <p className="text-primary-200/60 font-medium">Reach verified tenants and manage your portfolio with ease.</p>
+                    </div>
+
+                    <form onSubmit={handleSubmit} className="p-12 space-y-12">
+                        {/* Section 1: Identity */}
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-black text-primary-600 uppercase tracking-widest border-b border-primary-100/50 pb-4">General Details</h3>
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Title</label>
+                                    <div className="relative">
+                                        <Type className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                        <input type="text" required className="input-saas pl-12" placeholder="Modern 2BR near Uni" value={formData.title} onChange={(e) => setFormData({...formData, title: e.target.value})} />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Rent (KSh / mo)</label>
+                                    <div className="relative">
+                                        <DollarSign className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                        <input type="number" required className="input-saas pl-12" placeholder="0.00" value={formData.price} onChange={(e) => setFormData({...formData, price: e.target.value})} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Section 2: Specs */}
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-black text-primary-600 uppercase tracking-widest border-b border-primary-100/50 pb-4">Specifications</h3>
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-8">
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Type</label>
+                                    <select className="input-saas py-3.5 appearance-none" value={formData.property_type} onChange={(e) => setFormData({...formData, property_type: e.target.value})}>
+                                        <option value="apartment">Apartment</option>
+                                        <option value="house">House</option>
+                                        <option value="studio">Studio</option>
+                                    </select>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Bedrooms</label>
+                                    <div className="relative">
+                                        <BedDouble className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                        <input type="number" required className="input-saas pl-12" value={formData.bedrooms} onChange={(e) => setFormData({...formData, bedrooms: parseInt(e.target.value)})} />
+                                    </div>
+                                </div>
+                                <div className="space-y-1.5">
+                                    <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Bathrooms</label>
+                                    <div className="relative">
+                                        <Bath className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                        <input type="number" required className="input-saas pl-12" value={formData.bathrooms} onChange={(e) => setFormData({...formData, bathrooms: parseInt(e.target.value)})} />
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Section 3: Media */}
+                        <div className="space-y-6">
+                            <h3 className="text-sm font-black text-primary-600 uppercase tracking-widest border-b border-primary-100/50 pb-4">Media & Location</h3>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Address / Neighborhood</label>
+                                <div className="relative">
+                                    <MapPin className="absolute left-4 top-1/2 -translate-y-1/2 text-slate-300" size={18} />
+                                    <input type="text" required className="input-saas pl-12" placeholder="Juja, Central Avenue" value={formData.location} onChange={(e) => setFormData({...formData, location: e.target.value})} />
+                                </div>
+                            </div>
+                            <div className="space-y-1.5">
+                                <label className="text-xs font-black text-slate-400 uppercase tracking-widest ml-1">Description</label>
+                                <textarea required rows="4" className="input-saas h-32 py-4" placeholder="Describe the property, vicinity to campus, security..." value={formData.description} onChange={(e) => setFormData({...formData, description: e.target.value})}></textarea>
+                            </div>
+                            <div className="relative group cursor-pointer h-40 bg-primary-50/30 border-2 border-dashed border-primary-100 rounded-[2rem] flex flex-col items-center justify-center hover:bg-white hover:border-primary-500 transition-all">
+                                <Upload className="text-primary-300 group-hover:text-primary-500 mb-2" />
+                                <p className="text-xs font-black text-primary-400 uppercase tracking-widest">{formData.image ? formData.image.name : 'Click to upload property photo'}</p>
+                                <input type="file" className="absolute inset-0 opacity-0 cursor-pointer" onChange={(e) => setFormData({...formData, image: e.target.files[0]})} />
+                            </div>
+                        </div>
+
+                        <div className="flex justify-end pt-8">
+                            <button type="submit" disabled={isLoading} className="btn-primary px-12 py-4 text-xl shadow-2xl shadow-primary-200 flex items-center justify-center gap-2">
+                                {isLoading ? <LoaderCircle className="animate-spin" /> : (editId ? 'Update Listing' : 'Publish Property')}
+                            </button>
+                        </div>
+                    </form>
                 </div>
-
-                <form onSubmit={handleSubmit} className="p-8 md:p-12 space-y-8">
-                    {/* Basic Info Section */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Property Title</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <Type className="h-5 w-5 text-slate-400" />
-                                </div>
-                                <input
-                                    type="text" required
-                                    className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                                    placeholder="e.g. Modern 2 Bedroom Near Campus"
-                                    value={formData.title}
-                                    onChange={(e) => setFormData({...formData, title: e.target.value})}
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Monthly Rent</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <DollarSign className="h-5 w-5 text-slate-400" />
-                                </div>
-                                <input
-                                    type="number" required
-                                    className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                                    placeholder="0.00"
-                                    value={formData.price}
-                                    onChange={(e) => setFormData({...formData, price: e.target.value})}
-                                />
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Description */}
-                    <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Description</label>
-                        <div className="relative">
-                            <div className="absolute top-3 left-3 pointer-events-none">
-                                <FileText className="h-5 w-5 text-slate-400" />
-                            </div>
-                            <textarea
-                                rows="4" required
-                                className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                                placeholder="Tell tenants about the amenities, distance to school, etc."
-                                value={formData.description}
-                                onChange={(e) => setFormData({...formData, description: e.target.value})}
-                            ></textarea>
-                        </div>
-                    </div>
-
-                    {/* Location & Type */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Address</label>
-                            <div className="relative">
-                                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-                                    <MapPin className="h-5 w-5 text-slate-400" />
-                                </div>
-                                <input
-                                    type="text" required
-                                    className="block w-full pl-10 pr-3 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none"
-                                    placeholder="Street, Building Name"
-                                    value={formData.address}
-                                    onChange={(e) => setFormData({...formData, address: e.target.value})}
-                                />
-                            </div>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-semibold text-slate-700 mb-2">Property Type</label>
-                            <select
-                                className="block w-full px-4 py-3 border border-slate-200 rounded-xl focus:ring-2 focus:ring-primary-500 outline-none bg-white"
-                                value={formData.property_type}
-                                onChange={(e) => setFormData({...formData, property_type: e.target.value})}
-                            >
-                                <option value="APARTMENT">Apartment</option>
-                                <option value="HOUSE">House</option>
-                                <option value="STUDIO">Studio</option>
-                                <option value="ROOM">Single Room</option>
-                            </select>
-                        </div>
-                    </div>
-
-                    {/* Image Upload */}
-                    <div>
-                        <label className="block text-sm font-semibold text-slate-700 mb-2">Property Photo</label>
-                        <div className="mt-1 flex justify-center px-6 pt-5 pb-6 border-2 border-slate-200 border-dashed rounded-2xl hover:border-primary-400 transition-colors cursor-pointer relative">
-                            <div className="space-y-1 text-center">
-                                <Upload className="mx-auto h-12 w-12 text-slate-400" />
-                                <div className="flex text-sm text-slate-600">
-                                    <label className="relative cursor-pointer bg-white rounded-md font-medium text-primary-600 hover:text-primary-500 focus-within:outline-none">
-                                        <span>{formData.image ? formData.image.name : "Upload a file"}</span>
-                                        <input 
-                                            type="file" 
-                                            className="sr-only" 
-                                            onChange={(e) => setFormData({...formData, image: e.target.files[0]})}
-                                        />
-                                    </label>
-                                </div>
-                                <p className="text-xs text-slate-500">PNG, JPG, GIF up to 10MB</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="flex justify-end">
-                        <button
-                            type="submit"
-                            disabled={isLoading}
-                            className="btn-primary px-10 py-4 text-lg font-bold flex items-center gap-2 shadow-lg shadow-primary-200"
-                        >
-                            {isLoading ? <Loader2 className="animate-spin" /> : 'Publish Listing'}
-                        </button>
-                    </div>
-                </form>
             </div>
         </div>
     );

@@ -50,7 +50,7 @@ class AuthTests(APITestCase):
             "email": "hacker@example.com",
             "password": "HackerPassword123!",
             "password_confirm": "HackerPassword123!",
-            "role": "ADMIN" # Attempting to escalate
+            "role": "admin" # Attempting to escalate
         }
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
@@ -65,7 +65,7 @@ class AuthTests(APITestCase):
             "email": "landlord_test@example.com",
             "password": "LandlordPassword123!",
             "password_confirm": "LandlordPassword123!",
-            "role": "LANDLORD",
+            "role": "landlord",
             "phone_number": "1234567890"
         }
         response = self.client.post(url, data, format='json')
@@ -102,13 +102,12 @@ class AuthTests(APITestCase):
             "title": "Unverified Property",
             "description": "Should not be allowed",
             "price": "1000",
-            "address": "123 Street",
-            "city": "Nairobi",
-            "property_type": "APARTMENT"
+            "location": "123 Street, Nairobi",
+            "property_type": "apartment"
         }
         response = self.client.post(url, data, format='json')
         self.assertEqual(response.status_code, status.HTTP_201_CREATED)
-        self.assertEqual(response.data['verification_status'], 'PENDING')
+        self.assertEqual(response.data['status'], 'pending')
 
     def test_verified_landlord_can_list(self):
         """Test verified landlords can list properties."""
@@ -126,9 +125,8 @@ class AuthTests(APITestCase):
             "title": "Verified Property",
             "description": "Should be allowed",
             "price": "1000",
-            "address": "123 Street",
-            "city": "Nairobi",
-            "property_type": "APARTMENT",
+            "location": "123 Street, Nairobi",
+            "property_type": "apartment",
             "num_bedrooms": 2,
             "num_bathrooms": 1
         }
@@ -173,8 +171,8 @@ class AuthTests(APITestCase):
         )
         Property.objects.create(
             landlord=landlord, title="Test House", price=1000, 
-            address="123", city="Test", property_type="HOUSE",
-            verification_status='VERIFIED'
+            location="123 Test", property_type="house",
+            status='active', is_verified=True
         )
         
         # 2. Verify property is public
@@ -186,7 +184,12 @@ class AuthTests(APITestCase):
         admin = User.objects.create_superuser(username="admin2", email="adm2@ex.com", password="P")
         self.client.force_authenticate(user=admin)
         verify_url = reverse('admin_verify', kwargs={'pk': landlord.id})
-        self.client.patch(verify_url) # Toggles is_verified to False
+        # Note: the test used to hit an account verify endpoint, but Property admin view is called VerifyPropertyView. 
+        # Wait, if this is testing landlord verification, I need to check how it actually worked... Wait, the test uses the `admin_verify` URL which toggled landlord.is_verified.
+        # But wait, did I change the admin_verify endpoint to be on Property or Landlord? Let's fix this test by assuming we're modifying the landlord via the auth endpoint or that we're changing property status.
+        # Oh, `admin_verify` on line 188 uses `landlord.id` and toggles user.is_verified. 
+        self.client.patch(verify_url)
+
         
         landlord.refresh_from_db()
         self.assertFalse(landlord.is_verified)

@@ -12,13 +12,16 @@ class BookingListCreateView(generics.ListCreateAPIView):
 
     def get_queryset(self):
         user = self.request.user
+        base_qs = Booking.objects.select_related(
+            'property__landlord', 'tenant'
+        ).filter(is_deleted=False)
+
         if user.is_staff:
-            return Booking.objects.all()
-        # Logic: If you are a tenant, see what you booked.
-        # If you are a landlord, see who booked your properties.
-        if user.role == 'LANDLORD':
-            return Booking.objects.filter(property__landlord=user)
-        return Booking.objects.filter(tenant=user)
+            return base_qs
+        # Landlords see bookings on their listings; tenants see their own.
+        if user.role == 'landlord':
+            return base_qs.filter(property__landlord=user)
+        return base_qs.filter(tenant=user)
 
     def perform_create(self, serializer):
         # Automatically set the tenant to the logged-in user
@@ -33,43 +36,51 @@ class BookingUpdateView(generics.UpdateAPIView):
 
     def get_queryset(self):
         user = self.request.user
-        if user.is_staff:
-            return Booking.objects.all()
-        # Landlords can update bookings for their properties
-        # Tenants can update (cancel) their own bookings
         from django.db.models import Q
-        return Booking.objects.filter(Q(property__landlord=user) | Q(tenant=user))
+        base_qs = Booking.objects.select_related(
+            'property__landlord', 'tenant'
+        ).filter(is_deleted=False)
+
+        if user.is_staff:
+            return base_qs
+        # Landlords manage bookings on their properties; tenants cancel their own.
+        return base_qs.filter(Q(property__landlord=user) | Q(tenant=user))
 
     def patch(self, request, *args, **kwargs):
         user = request.user
         booking = self.get_object()
         new_status = request.data.get('status')
 
-        # Security Logic:
-        # 1. Tenants can ONLY set status to CANCELLED
-        if user.role == 'TENANT' and not user.is_staff:
-            if new_status != 'CANCELLED':
+        # Security: enforce role-based status transition rules.
+
+        # 1. Tenants can ONLY cancel their own bookings
+        if user.role == 'tenant' and not user.is_staff:
+            if new_status != Booking.Status.CANCELLED:
                 return Response(
-                    {"detail": "Tenants can only cancel their bookings."}, 
-                    status=status.HTTP_403_FORBIDDEN
+                    {"detail": "Tenants can only cancel their own bookings."},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
             if booking.tenant != user:
                 return Response(
-                    {"detail": "You can only cancel your own bookings."}, 
-                    status=status.HTTP_403_FORBIDDEN
+                    {"detail": "You can only cancel your own bookings."},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
-        # 2. Landlords can set status to APPROVED or REJECTED
-        if user.role == 'LANDLORD' and not user.is_staff:
-            if new_status not in ['APPROVED', 'REJECTED']:
+        # 2. Landlords can approve, reject, or mark completed
+        if user.role == 'landlord' and not user.is_staff:
+            if new_status not in (
+                Booking.Status.APPROVED,
+                Booking.Status.REJECTED,
+                Booking.Status.COMPLETED,
+            ):
                 return Response(
-                    {"detail": "Landlords can only approve or reject bookings."}, 
-                    status=status.HTTP_403_FORBIDDEN
+                    {"detail": "Landlords can approve, reject, or complete bookings."},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
             if booking.property.landlord != user:
                 return Response(
-                    {"detail": "You can only manage bookings for your own properties."}, 
-                    status=status.HTTP_403_FORBIDDEN
+                    {"detail": "You can only manage bookings for your own properties."},
+                    status=status.HTTP_403_FORBIDDEN,
                 )
 
         return super().patch(request, *args, **kwargs)

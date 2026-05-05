@@ -49,7 +49,7 @@ class AdminLandlordListView(generics.ListAPIView):
     """
     Allows Admins to see all landlords for verification.
     """
-    queryset = User.objects.filter(role='LANDLORD')
+    queryset = User.objects.filter(role='landlord')
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAdminUser]
 
@@ -57,7 +57,7 @@ class VerifyLandlordView(generics.UpdateAPIView):
     """
     Allows Admins to verify a landlord.
     """
-    queryset = User.objects.filter(role='LANDLORD')
+    queryset = User.objects.filter(role='landlord')
     serializer_class = UserSerializer
     permission_classes = [permissions.IsAuthenticated]
 
