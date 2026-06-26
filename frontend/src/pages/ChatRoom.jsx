@@ -117,7 +117,13 @@ const ChatRoom = () => {
                                         </p>
                                     </div>
                                 </button>
-                            )) : <div className="p-12 text-center text-slate-300 font-bold">No messages yet</div>}
+                            )) : (
+                                <div className="p-12 text-center flex flex-col items-center justify-center py-20">
+                                    <MessageSquare size={40} className="text-primary-200 mb-4" />
+                                    <p className="font-black text-slate-900 mb-1">No chats yet</p>
+                                    <p className="text-xs text-slate-400 font-medium max-w-[200px] mx-auto">Find a property you like and message the landlord to get started.</p>
+                                </div>
+                            )}
                         </div>
                     </div>
 

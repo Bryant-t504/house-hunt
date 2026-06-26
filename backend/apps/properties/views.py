@@ -92,15 +92,14 @@ class PropertyListCreateView(generics.ListCreateAPIView):
 
     def perform_create(self, serializer):
         user = self.request.user
-        import logging
-        logger = logging.getLogger('django')
-        logger.error(f"DEBUG: User={user.username}, Role={user.role}")
 
         # Only landlords (and admins acting as landlords) may create listings
-        # Using .lower() to handle any database inconsistencies
         if str(user.role).lower() not in ('landlord', 'admin', 'super_admin'):
-            logger.error(f"DEBUG: Permission Denied for {user.username} with role {user.role}")
             raise PermissionDenied("Only landlords can create property listings.")
+            
+        # Ensure landlord is verified
+        if str(user.role).lower() == 'landlord' and not user.is_verified:
+            raise PermissionDenied("Only verified landlords can create property listings.")
         
         # Landlord is auto-set; listing starts as 'pending' awaiting verification
         serializer.save(landlord=user, status='pending')
@@ -164,15 +163,9 @@ class VerifyPropertyView(generics.UpdateAPIView):
     """
     queryset = Property.objects.all()
     serializer_class = PropertySerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def patch(self, request, *args, **kwargs):
-        if not request.user.is_staff:
-            return Response(
-                {"detail": "Admin access required."},
-                status=status.HTTP_403_FORBIDDEN,
-            )
-
         property_obj = self.get_object()
         new_status = request.data.get('status')
         valid_statuses = [s.value for s in Property.Status]

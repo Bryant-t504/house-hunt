@@ -71,24 +71,31 @@ class ConversationCreateView(generics.CreateAPIView):
         User = get_user_model()
 
         property_id = request.data.get('property')
-        landlord_id = request.data.get('landlord')
+        target_id = request.data.get('target_user') or request.data.get('landlord') or request.data.get('tenant')
 
-        if not property_id or not landlord_id:
+        if not property_id or not target_id:
             return Response(
-                {"detail": "Both 'property' and 'landlord' fields are required."},
+                {"detail": "Both 'property' and a target user ID are required."},
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
         try:
             property_obj = PropertyModel.objects.get(pk=property_id, is_deleted=False)
-            landlord = User.objects.get(pk=landlord_id)
+            target_user = User.objects.get(pk=target_id)
         except (PropertyModel.DoesNotExist, User.DoesNotExist) as e:
             return Response({"detail": str(e)}, status=status.HTTP_404_NOT_FOUND)
 
+        if str(request.user.role).lower() in ('landlord', 'admin', 'super_admin'):
+            tenant_user = target_user
+            landlord_user = request.user
+        else:
+            tenant_user = request.user
+            landlord_user = target_user
+
         conversation, created = Conversation.objects.get_or_create(
             property=property_obj,
-            tenant=request.user,
-            landlord=landlord,
+            tenant=tenant_user,
+            landlord=landlord_user,
         )
 
         http_status = status.HTTP_201_CREATED if created else status.HTTP_200_OK

@@ -195,6 +195,7 @@ class AuthTests(APITestCase):
         self.assertFalse(landlord.is_verified)
         
         # 4. Verify property is now hidden from public (logout admin first)
+        self.client.force_authenticate(user=None)
         self.client.logout()
         response = self.client.get(url)
         self.assertEqual(len(response.data['results']), 0)

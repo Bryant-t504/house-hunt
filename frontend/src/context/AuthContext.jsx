@@ -62,7 +62,15 @@ export const AuthProvider = ({ children }) => {
         }
     };
 
-    const logoutUser = () => {
+    const logoutUser = async () => {
+        const refresh = localStorage.getItem('refresh_token');
+        if (refresh) {
+            try {
+                await api.post('/auth/logout/', { refresh });
+            } catch (error) {
+                console.error("Failed to blacklist token on logout", error);
+            }
+        }
         localStorage.removeItem('access_token');
         localStorage.removeItem('refresh_token');
         setUser(null);

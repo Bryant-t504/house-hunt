@@ -140,7 +140,7 @@ const AdminDashboard = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {landlords.map(l => (
+                                {landlords.length > 0 ? landlords.map(l => (
                                     <tr key={l.id} className="hover:bg-slate-50/50 transition-all">
                                         <td className="px-8 py-6">
                                             <div className="flex items-center gap-4">
@@ -159,7 +159,13 @@ const AdminDashboard = () => {
                                             <button onClick={() => toggleLandlordVerify(l.id)} className={`px-5 py-2.5 rounded-xl text-xs font-black uppercase tracking-widest transition-all ${l.is_verified ? 'bg-rose-50 text-rose-600 hover:bg-rose-100' : 'bg-primary-600 text-white hover:bg-primary-700 shadow-lg shadow-primary-100'}`}>{l.is_verified ? 'Revoke' : 'Verify'}</button>
                                         </td>
                                     </tr>
-                                ))}
+                                )) : (
+                                    <tr>
+                                        <td colSpan="4" className="px-8 py-16 text-center text-slate-400 font-bold">
+                                            No landlords registered yet.
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>
@@ -177,7 +183,7 @@ const AdminDashboard = () => {
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-slate-50">
-                                {properties.map(p => (
+                                {properties.length > 0 ? properties.map(p => (
                                     <tr key={p.id} className="hover:bg-slate-50/50 transition-all">
                                         <td className="px-8 py-6">
                                             <p className="font-bold text-slate-900 mb-1">{p.title}</p>
@@ -190,7 +196,13 @@ const AdminDashboard = () => {
                                             <button onClick={() => updatePropertyStatus(p.id, 'rejected')} className="p-2.5 bg-rose-50 text-rose-600 rounded-xl hover:bg-rose-100 transition-all"><X size={18} /></button>
                                         </td>
                                     </tr>
-                                ))}
+                                )) : (
+                                    <tr>
+                                        <td colSpan="4" className="px-8 py-16 text-center text-slate-400 font-bold">
+                                            No properties listed yet.
+                                        </td>
+                                    </tr>
+                                )}
                             </tbody>
                         </table>
                     </div>

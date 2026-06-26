@@ -59,12 +59,9 @@ class VerifyLandlordView(generics.UpdateAPIView):
     """
     queryset = User.objects.filter(role='landlord')
     serializer_class = UserSerializer
-    permission_classes = [permissions.IsAuthenticated]
+    permission_classes = [permissions.IsAdminUser]
 
     def patch(self, request, *args, **kwargs):
-        if not request.user.is_staff:
-            return Response({"detail": "Admin access required."}, status=status.HTTP_403_FORBIDDEN)
-            
         user = self.get_object()
         user.is_verified = not user.is_verified # Toggle verification
         user.save()

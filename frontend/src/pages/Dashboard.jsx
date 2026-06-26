@@ -4,6 +4,35 @@ import AuthContext from '../context/AuthContext';
 import { Calendar, MapPin, CheckCircle, XCircle, Clock, LoaderCircle, User, Building2, Trash2, Edit, Eye, EyeOff, Plus, MessageSquare, ChevronRight, Activity, Home, LayoutGrid } from 'lucide-react';
 import { Link, useNavigate } from 'react-router-dom';
 
+const ListingSkeleton = () => (
+    <div className="card-saas animate-pulse border-none shadow-saas">
+        <div className="h-56 bg-slate-200"></div>
+        <div className="p-8 space-y-4">
+            <div className="h-6 bg-slate-200 rounded w-3/4"></div>
+            <div className="h-4 bg-slate-100 rounded w-1/2"></div>
+            <div className="flex gap-2 pt-6 border-t border-slate-100">
+                <div className="w-10 h-10 bg-slate-200 rounded-xl"></div>
+                <div className="w-10 h-10 bg-slate-200 rounded-xl"></div>
+                <div className="w-10 h-10 bg-slate-200 rounded-xl ml-auto"></div>
+            </div>
+        </div>
+    </div>
+);
+
+const BookingSkeleton = () => (
+    <div className="card-saas p-8 animate-pulse border-none shadow-saas space-y-6">
+        <div className="flex items-center gap-3">
+            <div className="h-6 bg-slate-200 rounded w-20"></div>
+            <div className="h-4 bg-slate-100 rounded w-12"></div>
+        </div>
+        <div className="h-8 bg-slate-200 rounded w-1/2"></div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <div className="h-16 bg-slate-100 rounded-2xl"></div>
+            <div className="h-16 bg-slate-100 rounded-2xl"></div>
+        </div>
+    </div>
+);
+
 const Dashboard = () => {
     const { user } = useContext(AuthContext);
     const navigate = useNavigate();
@@ -47,12 +76,10 @@ const Dashboard = () => {
         catch (e) { alert("Error deleting"); }
     };
 
-    if (loading) return <div className="min-h-screen flex items-center justify-center"><LoaderCircle className="w-12 h-12 text-primary-600 animate-spin" /></div>;
-
     const stats = [
-        { label: 'Total Properties', value: properties.length, icon: Building2, color: 'text-primary-900', bg: 'bg-primary-100' },
-        { label: 'Pending Requests', value: bookings.filter(b => b.status === 'pending').length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
-        { label: 'Approved Viewings', value: bookings.filter(b => b.status === 'approved').length, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
+        { label: 'Total Properties', value: loading ? '...' : properties.length, icon: Building2, color: 'text-primary-900', bg: 'bg-primary-100' },
+        { label: 'Pending Requests', value: loading ? '...' : bookings.filter(b => b.status === 'pending').length, icon: Clock, color: 'text-amber-600', bg: 'bg-amber-50' },
+        { label: 'Approved Viewings', value: loading ? '...' : bookings.filter(b => b.status === 'approved').length, icon: CheckCircle, color: 'text-emerald-600', bg: 'bg-emerald-50' },
     ];
 
     return (
@@ -105,7 +132,9 @@ const Dashboard = () => {
                 {/* Properties Section */}
                 {activeTab === 'properties' && user?.role === 'landlord' && (
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-8 animate-in">
-                        {properties.length > 0 ? properties.map(p => (
+                        {loading ? (
+                            [...Array(3)].map((_, idx) => <ListingSkeleton key={idx} />)
+                        ) : properties.length > 0 ? properties.map(p => (
                             <div key={p.id} className="card-saas group flex flex-col border-none shadow-saas hover:shadow-saas-xl">
                                 <div className="relative h-56 overflow-hidden">
                                     <img src={p.images?.[0]?.image_url.startsWith('http') ? p.images[0].image_url : `http://127.0.0.1:8000${p.images?.[0]?.image_url}`} className="w-full h-full object-cover transition-transform group-hover:scale-105" />

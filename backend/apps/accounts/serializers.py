@@ -21,6 +21,11 @@ class RegisterSerializer(serializers.ModelSerializer):
     """
     password = serializers.CharField(write_only=True, required=True, validators=[validate_password])
     password_confirm = serializers.CharField(write_only=True, required=True)
+    role = serializers.ChoiceField(
+        choices=[(User.Role.TENANT, 'Tenant'), (User.Role.LANDLORD, 'Landlord')],
+        required=False,
+        default=User.Role.TENANT
+    )
 
     class Meta:
         model = User
@@ -34,21 +39,17 @@ class RegisterSerializer(serializers.ModelSerializer):
         # Ensure email is unique
         if User.objects.filter(email=attrs['email']).exists():
             raise serializers.ValidationError({"email": "A user with this email already exists."})
-            
-        # Security: Prevent unauthorized role assignment (only tenant or landlord allowed)
-        role = attrs.get('role', 'tenant')
-        if role not in [User.Role.TENANT, User.Role.LANDLORD]:
-            attrs['role'] = User.Role.TENANT # Force to Tenant if invalid/Admin
 
         return attrs
 
     def create(self, validated_data):
-        # Remove the password_confirm field
         validated_data.pop('password_confirm')
-        
-        # Use the provided role, default to tenant
-        role = validated_data.get('role', User.Role.TENANT)
-        
+        role = validated_data.pop('role', User.Role.TENANT)
+
+        # Extra safety: Ensure only valid roles are created
+        if role not in (User.Role.TENANT, User.Role.LANDLORD):
+            role = User.Role.TENANT
+
         user = User.objects.create_user(
             username=validated_data['username'],
             email=validated_data['email'],

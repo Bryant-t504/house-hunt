@@ -48,7 +48,7 @@ const Navbar = () => {
                             {user.role === 'landlord' && (
                                 <NavLink to="/add-property" icon={PlusCircle}>List Property</NavLink>
                             )}
-                            {user.role === 'admin' && (
+                            {(user.role === 'admin' || user.is_staff) && (
                                 <NavLink to="/admin-center" icon={ShieldCheck}>Admin</NavLink>
                             )}
                         </>
@@ -100,7 +100,7 @@ const Navbar = () => {
                             {user.role === 'landlord' && (
                                 <NavLink to="/add-property" icon={PlusCircle}>List Property</NavLink>
                             )}
-                            {user.role === 'admin' && (
+                            {(user.role === 'admin' || user.is_staff) && (
                                 <NavLink to="/admin-center" icon={ShieldCheck}>Admin</NavLink>
                             )}
                         </>

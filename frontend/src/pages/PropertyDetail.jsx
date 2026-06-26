@@ -2,13 +2,77 @@ import { useState, useEffect, useContext } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import api from '../api/axios';
 import AuthContext from '../context/AuthContext';
-import { MapPin, ArrowLeft, LoaderCircle, CheckCircle, Send, BedDouble, Bath, ShieldCheck, Zap, Info, MessageSquare } from 'lucide-react';
+import { MapPin, ArrowLeft, CheckCircle, BedDouble, Bath, ShieldCheck, Zap, Info, MessageSquare, ChevronLeft, ChevronRight, Home, AlertTriangle } from 'lucide-react';
+
+// ─── Skeleton Loader ────────────────────────────────────────────────────────
+const PropertyDetailSkeleton = () => (
+    <div className="bg-primary-50/20 min-h-screen pb-20 animate-pulse">
+        <div className="h-[60vh] min-h-[400px] bg-slate-200" />
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
+            <div className="lg:col-span-2 space-y-8">
+                <div className="bg-white rounded-[2rem] p-8 shadow-saas flex gap-8">
+                    <div className="h-20 bg-slate-100 rounded-2xl flex-1" />
+                    <div className="h-20 bg-slate-100 rounded-2xl flex-1" />
+                    <div className="h-20 bg-slate-100 rounded-2xl flex-1" />
+                </div>
+                <div className="bg-white rounded-[2rem] p-8 shadow-saas space-y-4">
+                    <div className="h-6 bg-slate-200 rounded w-1/3" />
+                    <div className="h-4 bg-slate-100 rounded" />
+                    <div className="h-4 bg-slate-100 rounded w-4/5" />
+                    <div className="h-4 bg-slate-100 rounded w-3/5" />
+                </div>
+            </div>
+            <div className="bg-white rounded-[2.5rem] p-8 shadow-saas-lg space-y-6">
+                <div className="h-12 bg-slate-200 rounded-xl w-2/3" />
+                <div className="h-48 bg-slate-100 rounded-2xl" />
+                <div className="h-12 bg-slate-200 rounded-2xl" />
+            </div>
+        </div>
+    </div>
+);
+
+// ─── Image Gallery ───────────────────────────────────────────────────────────
+const ImageGallery = ({ images, title }) => {
+    const [current, setCurrent] = useState(0);
+    const total = images.length;
+    const prev = () => setCurrent(i => (i - 1 + total) % total);
+    const next = () => setCurrent(i => (i + 1) % total);
+    return (
+        <div className="relative h-full w-full bg-slate-900 group">
+            <img
+                key={current}
+                src={images[current]}
+                alt={`${title} — photo ${current + 1}`}
+                className="w-full h-full object-cover opacity-80 transition-opacity duration-500"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent" />
+            {total > 1 && (
+                <>
+                    <button onClick={prev} className="absolute left-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/10 backdrop-blur-md hover:bg-white/30 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg">
+                        <ChevronLeft size={20} />
+                    </button>
+                    <button onClick={next} className="absolute right-4 top-1/2 -translate-y-1/2 w-11 h-11 bg-white/10 backdrop-blur-md hover:bg-white/30 text-white rounded-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all shadow-lg">
+                        <ChevronRight size={20} />
+                    </button>
+                    <div className="absolute bottom-6 right-6 bg-slate-900/60 backdrop-blur-md text-white text-xs font-black px-3 py-1.5 rounded-full">
+                        {current + 1} / {total}
+                    </div>
+                    <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2">
+                        {images.map((_, i) => (
+                            <button key={i} onClick={() => setCurrent(i)} className={`w-2 h-2 rounded-full transition-all ${i === current ? 'bg-white scale-125' : 'bg-white/40 hover:bg-white/70'}`} />
+                        ))}
+                    </div>
+                </>
+            )}
+        </div>
+    );
+};
 
 const PropertyDetail = () => {
     const { id } = useParams();
     const { user } = useContext(AuthContext);
     const navigate = useNavigate();
-    
+
     const [property, setProperty] = useState(null);
     const [loading, setLoading] = useState(true);
     const [bookingLoading, setBookingLoading] = useState(false);
@@ -49,7 +113,7 @@ const PropertyDetail = () => {
             console.error("Booking error:", error);
             const errData = error.response?.data;
             let errMsg = "Failed to book viewing. Please check your inputs.";
-            
+
             if (errData) {
                 if (errData.non_field_errors) {
                     errMsg = errData.non_field_errors[0];
@@ -71,45 +135,50 @@ const PropertyDetail = () => {
         }
     };
 
-    if (loading) return (
-        <div className="min-h-screen flex items-center justify-center bg-primary-50/20">
-            <LoaderCircle className="w-12 h-12 text-primary-600 animate-spin" />
-        </div>
-    );
+    if (loading) return <PropertyDetailSkeleton />;
 
-    if (!property) return (
-        <div className="max-w-7xl mx-auto px-4 py-32 text-center">
-            <div className="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <Info className="w-10 h-10 text-slate-400" />
+    if (!property) {
+        return (
+            <div className="min-h-screen bg-primary-50/20 flex items-center justify-center px-4">
+                <div className="text-center max-w-md">
+                    <div className="w-24 h-24 bg-rose-50 rounded-[2rem] flex items-center justify-center mx-auto mb-8">
+                        <AlertTriangle className="w-12 h-12 text-rose-400" />
+                    </div>
+                    <h2 className="text-4xl font-black text-slate-900 mb-3">Property Not Found</h2>
+                    <p className="text-slate-500 font-medium mb-10 leading-relaxed">The listing you're looking for doesn't exist or may have been removed.</p>
+                    <div className="flex flex-col sm:flex-row gap-4 justify-center">
+                        <Link to="/" className="btn-primary px-8 py-3.5"><Home size={18} /> Browse Listings</Link>
+                        <button onClick={() => navigate(-1)} className="btn-secondary px-8 py-3.5"><ChevronLeft size={18} /> Go Back</button>
+                    </div>
+                </div>
             </div>
-            <h2 className="text-3xl font-extrabold text-slate-900">Property not found</h2>
-            <p className="text-slate-500 mt-2 mb-8">The property you're looking for doesn't exist or is unavailable.</p>
-            <Link to="/" className="btn-primary inline-flex">Return Home</Link>
-        </div>
-    );
+        );
+    }
 
-    const imageUrl = property.image 
-        ? (property.image.startsWith('http') ? property.image : `http://127.0.0.1:8000${property.image}`)
-        : 'https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=1200';
+    // Resolve gallery images
+    const resolveUrl = (u) => u?.startsWith('http') ? u : `http://127.0.0.1:8000${u}`;
+    const galleryImages = property.images?.length
+        ? property.images.map(img => resolveUrl(img.image_url))
+        : property.image
+            ? [resolveUrl(property.image)]
+            : ['https://images.unsplash.com/photo-1564013799919-ab600027ffc6?auto=format&fit=crop&q=80&w=1200'];
 
-    return (
     return (
         <div className="bg-primary-50/20 min-h-screen pb-20">
-            {/* Hero Image Section */}
-            <div className="relative h-[60vh] min-h-[400px] w-full bg-slate-900">
-                <img src={imageUrl} alt={property.title} className="w-full h-full object-cover opacity-80 mix-blend-overlay" />
-                <div className="absolute inset-0 bg-gradient-to-t from-slate-900 via-slate-900/40 to-transparent"></div>
-                
+            {/* Hero Gallery */}
+            <div className="relative h-[60vh] min-h-[400px] w-full">
+                <ImageGallery images={galleryImages} title={property.title} />
+
                 <div className="absolute top-8 left-4 sm:left-8 z-10">
-                    <Link to="/" className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-xl text-white font-semibold transition-all">
-                        <ArrowLeft className="w-5 h-5" /> Back to Search
-                    </Link>
+                    <button onClick={() => navigate(-1)} className="inline-flex items-center gap-2 px-4 py-2 bg-white/10 hover:bg-white/20 backdrop-blur-md rounded-xl text-white font-semibold transition-all">
+                        <ChevronLeft className="w-5 h-5" /> Back
+                    </button>
                 </div>
 
-                <div className="absolute bottom-12 left-0 right-0">
+                <div className="absolute bottom-12 left-0 right-0 z-10">
                     <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
                         <div className="flex flex-wrap gap-3 mb-4">
-                            <span className="bg-primary-600 text-white px-4 py-1.5 rounded-full text-sm font-bold tracking-wider uppercase shadow-lg">
+                            <span className="bg-primary-600 text-white px-4 py-1.5 rounded-full text-sm font-bold tracking-wider uppercase shadow-lg capitalize">
                                 {property.property_type}
                             </span>
                             {property.is_verified && (
@@ -118,7 +187,7 @@ const PropertyDetail = () => {
                                 </span>
                             )}
                         </div>
-                        <h1 className="text-4xl md:text-6xl font-black text-white leading-tight mb-4 text-shadow-xl">{property.title}</h1>
+                        <h1 className="text-4xl md:text-6xl font-black text-white leading-tight mb-4">{property.title}</h1>
                         <div className="flex items-center gap-3 text-slate-200 text-lg md:text-xl font-medium">
                             <MapPin className="w-6 h-6 text-primary-400" />
                             <span>{property.location}</span>
@@ -128,10 +197,10 @@ const PropertyDetail = () => {
             </div>
 
             <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 mt-8 grid grid-cols-1 lg:grid-cols-3 gap-8">
-                
+
                 {/* Main Content */}
                 <div className="lg:col-span-2 space-y-8">
-                    
+
                     {/* Quick Stats */}
                     <div className="bg-white rounded-[2rem] p-8 shadow-saas border border-primary-100/50 flex flex-wrap gap-8">
                         <div className="flex items-center gap-4">
@@ -181,12 +250,13 @@ const PropertyDetail = () => {
                 {/* Sidebar (Booking CTA) */}
                 <div className="space-y-6">
                     <div className="bg-white p-8 rounded-[2.5rem] shadow-saas-lg border border-primary-100/50 sticky top-24">
-                        
+
                         {/* Price */}
                         <div className="mb-8 pb-8 border-b border-slate-100">
+                            <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Monthly Rent</p>
                             <div className="flex items-end gap-2">
-                                <span className="text-5xl font-black text-slate-900">${parseFloat(property.price).toLocaleString()}</span>
-                                <span className="text-slate-500 font-bold mb-1">/ month</span>
+                                <span className="text-5xl font-black text-slate-900">KSh {parseFloat(property.price).toLocaleString()}</span>
+                                <span className="text-slate-500 font-bold mb-1">/ mo</span>
                             </div>
                         </div>
 
@@ -212,7 +282,7 @@ const PropertyDetail = () => {
                                     <>
                                         <div className="space-y-1.5">
                                             <label className="text-sm font-bold text-slate-700 ml-1">Preferred Viewing Date</label>
-                                            <input 
+                                            <input
                                                 type="datetime-local" required
                                                 className="input-saas font-medium"
                                                 value={preferredDate}
@@ -221,24 +291,24 @@ const PropertyDetail = () => {
                                         </div>
                                         <div className="space-y-1.5">
                                             <label className="text-sm font-bold text-slate-700 ml-1">Message to Landlord (Optional)</label>
-                                            <textarea 
+                                            <textarea
                                                 className="input-saas font-medium resize-none h-32"
                                                 placeholder="Hi! I'm interested in viewing this property..."
                                                 value={message}
                                                 onChange={(e) => setMessage(e.target.value)}
                                             ></textarea>
                                         </div>
-                                        
-                                        <button 
+
+                                        <button
                                             type="submit"
                                             disabled={bookingLoading}
                                             className="w-full btn-primary py-4 text-lg mt-4 flex items-center justify-center gap-2"
                                         >
                                             {bookingLoading ? <LoaderCircle className="animate-spin w-6 h-6" /> : <><Zap className="w-5 h-5" /> Request to Book</>}
                                         </button>
-                                        
+
                                         {user && user.id !== property.landlord && (
-                                            <button 
+                                            <button
                                                 type="button"
                                                 onClick={() => navigate(`/chat?with=${property.landlord}&property=${id}`)}
                                                 className="w-full btn-secondary py-4 text-lg"

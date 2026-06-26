@@ -14,6 +14,13 @@ class PropertyImageSerializer(serializers.ModelSerializer):
         fields = ('id', 'image_url', 'created_at')
         read_only_fields = ('id', 'created_at')
 
+    def validate_image_url(self, value):
+        if value:
+            max_size = 5 * 1024 * 1024  # 5MB
+            if value.size > max_size:
+                raise serializers.ValidationError("Image file size must not exceed 5 MB.")
+        return value
+
 
 class PropertySerializer(serializers.ModelSerializer):
     """
@@ -63,6 +70,13 @@ class PropertySerializer(serializers.ModelSerializer):
             'created_at',
             'updated_at',
         )
+
+    def validate_image(self, value):
+        if value:
+            max_size = 5 * 1024 * 1024  # 5MB
+            if value.size > max_size:
+                raise serializers.ValidationError("Image file size must not exceed 5 MB.")
+        return value
 
     def create(self, validated_data):
         image_data = validated_data.pop('image', None)
